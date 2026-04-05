@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String         @id @default(cuid())
+  name           String
+  email          String         @unique
+  password       String
+  role           String         @default("STAFF")
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  orders         Order[]        @relation("AssignedOrders")
+  activityLogs   ActivityLog[]
+  refreshTokens  RefreshToken[]
+}
+
+model Category {
+  id            String        @id @default(cuid())
+  name          String
+  slug          String        @unique
+  description   String?
+  imageUrl      String?
+  parentId      String?
+  parent        Category?     @relation("CategoryChildren", fields: [parentId], references: [id])
+  children      Category[]    @relation("CategoryChildren")
+  products      Product[]
+  sortOrder     Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Product {
+  id              String       @id @default(cuid())
+  name            String
+  slug            String       @unique
+  description     String?
+  price           Float
+  discount        Float        @default(0)
+  stock           Int          @default(0)
+  images          String       @default("[]")
+  categoryId      String?
+  category        Category?    @relation(fields: [categoryId], references: [id])
+  isActive        Boolean      @default(true)
+  isFeatured      Boolean      @default(false)
+  discountEndsAt  DateTime?
+  boostScore      Int          @default(0)
+  orderItems      OrderItem[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([categoryId])
+  @@index([isActive, isFeatured])
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  customerPhone   String
+  customerName    String?
+  status          String      @default("pending")
+  items           OrderItem[]
+  subtotal        Float
+  total           Float
+  assignedToId    String?
+  assignedTo      User?       @relation("AssignedOrders", fields: [assignedToId], references: [id])
+  payment         Payment?
+  notes           String?
+  expiresAt       DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  activityLogs    ActivityLog[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  name      String
+  price     Float
+  quantity  Int
+  total     Float
+  createdAt DateTime @default(now())
+}
+
+model Payment {
+  id                 String   @id @default(cuid())
+  orderId            String   @unique
+  order              Order    @relation(fields: [orderId], references: [id])
+  merchantRequestId  String?
+  checkoutRequestId  String?  @unique
+  mpesaReceiptNumber String?
+  phoneNumber        String
+  amount             Float
+  status             String   @default("pending")
+  resultCode         String?
+  resultDesc         String?
+  idempotencyKey     String   @unique
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+}
+
+model Advertisement {
+  id        String    @id @default(cuid())
+  title     String
+  type      String
+  placement String
+  imageUrl  String?
+  linkUrl   String?
+  content   String?
+  isActive  Boolean   @default(false)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model ContentPage {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  content   String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model HomepageSection {
+  id        String   @id @default(cuid())
+  type      String
+  title     String?
+  content   String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id])
+  action    String
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  ip        String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String
+  category  String
+  message   String
+  details   String?
+  userId    String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([level, createdAt])
+  @@index([category, createdAt])
+}

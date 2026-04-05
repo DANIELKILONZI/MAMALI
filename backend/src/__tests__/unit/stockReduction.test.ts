@@ -101,12 +101,9 @@ describe('reduceStock — stock deduction on order creation', () => {
   });
 
   it('throws with statusCode 400 when out of stock', () => {
-    try {
-      reduceStock(2, 3);
-      fail('should have thrown');
-    } catch (err: unknown) {
-      expect((err as { statusCode: number }).statusCode).toBe(400);
-    }
+    expect(() => reduceStock(2, 3)).toThrow(
+      expect.objectContaining({ message: 'Insufficient stock', statusCode: 400 })
+    );
   });
 
   it('does NOT throw when quantity equals exactly available stock', () => {

@@ -210,9 +210,9 @@ export function teardown() {
 ╔══════════════════════════════════════════════════╗
 ║         Late Payment Callback Run Summary         ║
 ╠══════════════════════════════════════════════════╣
-║ Processed  (2xx): ${callbacksProcessed.count}
-║ Expired/Unknown (4xx): ${callbacksExpired.count}
-║ Server Errors (5xx): ${callbackErrors.count}
+║ Processed  (2xx)       : ${String(callbacksProcessed.count).padStart(6)}              ║
+║ Expired/Unknown (4xx)  : ${String(callbacksExpired.count).padStart(6)}              ║
+║ Server Errors   (5xx)  : ${String(callbackErrors.count).padStart(6)}              ║
 ╚══════════════════════════════════════════════════╝
   `.trim());
 

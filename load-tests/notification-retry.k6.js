@@ -189,7 +189,7 @@ export default function () {
       return;
     }
 
-    let notificationId: string | null = null;
+    let notificationId = null;
     try {
       const body = JSON.parse(listRes.body);
       if (body.notifications && body.notifications.length > 0) {
@@ -237,10 +237,10 @@ export function teardown() {
 ╔══════════════════════════════════════════════════╗
 ║       Notification Retry Load Run Summary         ║
 ╠══════════════════════════════════════════════════╣
-║ Notification list requests — ok : ${listRequestsOk.count}
-║ Notification list requests — fail: ${listRequestsFail.count}
-║ Resend requests — ok   : ${retryRequestsOk.count}
-║ Resend requests — fail : ${retryRequestsFail.count}
+║ Notification list — ok   : ${String(listRequestsOk.count).padStart(6)}              ║
+║ Notification list — fail : ${String(listRequestsFail.count).padStart(6)}              ║
+║ Resend requests  — ok    : ${String(retryRequestsOk.count).padStart(6)}              ║
+║ Resend requests  — fail  : ${String(retryRequestsFail.count).padStart(6)}              ║
 ╚══════════════════════════════════════════════════╝
   `.trim());
 

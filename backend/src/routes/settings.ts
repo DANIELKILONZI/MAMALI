@@ -27,6 +27,9 @@ const settingsSchema = z.object({
   logoUrl: z.string().url().nullable().optional(),
   primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   themeColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  notificationsEnabled: z.boolean().optional(),
+  whatsappEnabled: z.boolean().optional(),
+  smsFallbackEnabled: z.boolean().optional(),
 });
 
 // Admin: PUT /api/admin/settings

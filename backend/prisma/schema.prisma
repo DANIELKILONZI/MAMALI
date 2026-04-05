@@ -209,14 +209,17 @@ model SystemLog {
 }
 
 model StoreSettings {
-  id           String   @id @default(cuid())
-  businessName String   @default("MAMALI")
-  currency     String   @default("KES")
-  logoUrl      String?
-  primaryColor String   @default("#2563eb")
-  themeColor   String   @default("#1e293b")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  businessName          String   @default("MAMALI")
+  currency              String   @default("KES")
+  logoUrl               String?
+  primaryColor          String   @default("#2563eb")
+  themeColor            String   @default("#1e293b")
+  notificationsEnabled  Boolean  @default(false)
+  whatsappEnabled       Boolean  @default(false)
+  smsFallbackEnabled    Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model Coupon {
@@ -282,4 +285,15 @@ model NotificationLog {
   @@index([orderId])
   @@index([status, createdAt])
   @@index([recipient])
+}
+
+// Blocked customers — checked on order creation
+model BlockedCustomer {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  reason    String?
+  blockedBy String?
+  createdAt DateTime @default(now())
+
+  @@index([phone])
 }

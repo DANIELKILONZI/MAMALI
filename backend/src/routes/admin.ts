@@ -8,6 +8,8 @@ import settingsRouter from './settings';
 import couponsRouter from './coupons';
 import analyticsRouter from './analytics';
 import inventoryRouter from './inventory';
+import customersRouter from './customers';
+import notificationsAdminRouter from './notificationsAdmin';
 
 const router = Router();
 
@@ -21,6 +23,8 @@ router.use('/settings', settingsRouter);
 router.use('/coupons', couponsRouter);
 router.use('/analytics', analyticsRouter);
 router.use('/inventory', inventoryRouter);
+router.use('/customers', customersRouter);
+router.use('/notifications', notificationsAdminRouter);
 
 export default router;
 

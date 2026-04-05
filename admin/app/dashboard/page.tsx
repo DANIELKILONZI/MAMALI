@@ -67,25 +67,49 @@ function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
               title="Total Revenue"
-              value={formatCurrency(data.totalRevenue ?? 0)}
+              value={formatCurrency(data.revenue?.total ?? data.totalRevenue ?? 0)}
+              sub={data.revenue?.growth !== undefined ? `${data.revenue.growth >= 0 ? '+' : ''}${data.revenue.growth}% vs last month` : undefined}
               icon="💰"
               color="blue"
             />
             <StatCard
               title="Total Orders"
-              value={String(Object.values(data.ordersByStatus ?? {}).reduce((a, b) => a + b, 0))}
+              value={String(data.orders?.total ?? Object.values(data.ordersByStatus ?? {}).reduce((a, b) => a + b, 0))}
               icon="🛒"
               color="green"
             />
             <StatCard
+              title="Avg Order Value"
+              value={formatCurrency(data.aov ?? 0)}
+              icon="📊"
+              color="purple"
+            />
+            <StatCard
+              title="Abandoned (24h)"
+              value={String(data.abandonedLast24h ?? 0)}
+              sub="expired unpaid orders"
+              icon="📉"
+              color="red"
+            />
+          </div>
+
+          {/* Secondary row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <StatCard
+              title="This Month"
+              value={formatCurrency(data.revenue?.thisMonth ?? 0)}
+              icon="📅"
+              color="green"
+            />
+            <StatCard
               title="Processing"
-              value={String(data.ordersByStatus?.processing ?? 0)}
+              value={String(data.orders?.processing ?? data.ordersByStatus?.processing ?? 0)}
               icon="⚙️"
               color="orange"
             />
             <StatCard
               title="Low Stock Items"
-              value={String(data.lowStockProducts?.length ?? 0)}
+              value={String((data.lowStockAlerts ?? data.lowStockProducts ?? []).length)}
               icon="⚠️"
               color="red"
             />
@@ -114,7 +138,9 @@ function DashboardPage() {
                       <span className="text-gray-400 text-xs w-4">{i + 1}</span>
                       <span className="text-sm text-gray-700">{p.name}</span>
                     </div>
-                    <span className="text-sm font-medium text-gray-600">{p.sales} sales</span>
+                    <span className="text-sm font-medium text-gray-600">
+                      {p.sales ?? 0} units
+                    </span>
                   </div>
                 ))}
                 {(data.topProducts ?? []).length === 0 && (
@@ -125,14 +151,14 @@ function DashboardPage() {
           </div>
 
           {/* Low Stock Alerts */}
-          {(data.lowStockProducts ?? []).length > 0 && (
+          {(data.lowStockAlerts ?? data.lowStockProducts ?? []).length > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-amber-800">⚠️ Low Stock Alerts</h3>
                 <Link href="/inventory" className="text-sm text-amber-700 hover:underline">View Inventory →</Link>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {data.lowStockProducts.map((p) => (
+                {(data.lowStockAlerts ?? data.lowStockProducts ?? []).map((p) => (
                   <div key={p.id} className="bg-white rounded p-3 text-sm">
                     <p className="font-medium text-gray-700">{p.name}</p>
                     <p className="text-red-600 font-bold">{p.stock} left</p>
@@ -190,19 +216,22 @@ function DashboardPage() {
 function StatCard({
   title,
   value,
+  sub,
   icon,
   color,
 }: {
   title: string;
   value: string;
+  sub?: string;
   icon: string;
-  color: 'blue' | 'green' | 'orange' | 'red';
+  color: 'blue' | 'green' | 'orange' | 'red' | 'purple';
 }) {
   const colors = {
     blue: 'bg-blue-50 border-blue-200',
     green: 'bg-green-50 border-green-200',
     orange: 'bg-orange-50 border-orange-200',
     red: 'bg-red-50 border-red-200',
+    purple: 'bg-purple-50 border-purple-200',
   };
   return (
     <div className={`rounded-lg border p-5 ${colors[color]}`}>
@@ -211,6 +240,7 @@ function StatCard({
       </div>
       <p className="text-2xl font-bold text-gray-900">{value}</p>
       <p className="text-sm text-gray-500 mt-1">{title}</p>
+      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
     </div>
   );
 }

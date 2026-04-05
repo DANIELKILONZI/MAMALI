@@ -50,6 +50,13 @@ router.post('/', checkoutRateLimiter, async (req: Request, res: Response, next: 
     const ipAddress = (req.ip ?? req.socket?.remoteAddress ?? '').replace('::ffff:', '');
     const userAgent = req.headers['user-agent'] ?? '';
 
+    // Reject orders from blocked customers
+    const blocked = await prisma.blockedCustomer.findUnique({ where: { phone: data.customerPhone } });
+    if (blocked) {
+      res.status(403).json({ success: false, message: 'This phone number is not allowed to place orders.' });
+      return;
+    }
+
     const order = await prisma.$transaction(async (tx) => {
       const products = await tx.product.findMany({
         where: { id: { in: data.items.map((i) => i.productId) }, isActive: true },

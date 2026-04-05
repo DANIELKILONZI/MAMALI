@@ -192,6 +192,42 @@ export const adminApi = {
   inventory: {
     intelligence: () => request<InventoryIntelligence>('/api/admin/inventory/intelligence'),
   },
+
+  customers: {
+    list: (params?: { page?: number; limit?: number; segment?: string; search?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.page) q.set('page', String(params.page));
+      if (params?.limit) q.set('limit', String(params.limit));
+      if (params?.segment && params.segment !== 'all') q.set('segment', params.segment);
+      if (params?.search) q.set('search', params.search);
+      const qs = q.toString();
+      return request<CustomerListResponse>(`/api/admin/customers${qs ? `?${qs}` : ''}`);
+    },
+    get: (phone: string) =>
+      request<CustomerDetailResponse>(`/api/admin/customers/${encodeURIComponent(phone)}`),
+    block: (phone: string, reason?: string) =>
+      request<{ success: boolean }>(`/api/admin/customers/${encodeURIComponent(phone)}/block`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
+    unblock: (phone: string) =>
+      request<{ success: boolean }>(`/api/admin/customers/${encodeURIComponent(phone)}/block`, {
+        method: 'DELETE',
+      }),
+  },
+
+  notifications: {
+    list: (params?: { page?: number; status?: string; channel?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.page) q.set('page', String(params.page));
+      if (params?.status && params.status !== 'all') q.set('status', params.status);
+      if (params?.channel && params.channel !== 'all') q.set('channel', params.channel);
+      const qs = q.toString();
+      return request<NotificationListResponse>(`/api/admin/notifications${qs ? `?${qs}` : ''}`);
+    },
+    resend: (id: string) =>
+      request<{ success: boolean }>(`/api/admin/notifications/${id}/resend`, { method: 'POST' }),
+  },
 };
 
 // ---- Types ----
@@ -205,10 +241,24 @@ export interface AdminUser {
 
 export interface DashboardData {
   totalRevenue: number;
+  aov: number;
+  abandonedLast24h: number;
   ordersByStatus: Record<string, number>;
   topProducts: { id: string; name: string; sales: number }[];
   lowStockProducts: { id: string; name: string; stock: number }[];
   recentOrders: Order[];
+  revenue?: {
+    total: number;
+    thisMonth: number;
+    lastMonth: number;
+    growth: number;
+  };
+  orders?: {
+    total: number;
+    pending: number;
+    processing: number;
+  };
+  lowStockAlerts?: { id: string; name: string; stock: number }[];
 }
 
 export interface Product {
@@ -320,6 +370,9 @@ export interface StoreSettings {
   logoUrl?: string | null;
   primaryColor: string;
   themeColor: string;
+  notificationsEnabled: boolean;
+  whatsappEnabled: boolean;
+  smsFallbackEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -489,4 +542,93 @@ export interface CustomerAnalytics {
   success: boolean;
   summary: CustomerAnalyticsSummary;
   topCustomers: CustomerStat[];
+}
+
+// ---- Customer Management ----
+
+export type CustomerSegment = 'vip' | 'returning' | 'inactive' | 'risky' | 'new' | 'all';
+
+export interface CustomerRecord {
+  phone: string;
+  name: string | null;
+  totalOrders: number;
+  totalSpent: number;
+  totalDiscount: number;
+  avgOrderValue: number;
+  lastOrderAt: string | null;
+  maxRiskScore: number;
+  segment: CustomerSegment;
+  isBlocked: boolean;
+}
+
+export interface CustomerListResponse {
+  success: boolean;
+  customers: CustomerRecord[];
+  pagination: { total: number; page: number; limit: number; pages: number };
+}
+
+export interface CustomerOrderItem {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+  total: number;
+}
+
+export interface CustomerOrder {
+  id: string;
+  orderNumber: string;
+  status: string;
+  total: number;
+  subtotal: number;
+  discountAmount: number;
+  couponCode: string | null;
+  createdAt: string;
+  riskScore: number;
+  items: CustomerOrderItem[];
+  payment: { status: string; mpesaReceiptNumber: string | null } | null;
+}
+
+export interface CustomerDetail {
+  phone: string;
+  name: string | null;
+  totalOrders: number;
+  totalSpent: number;
+  avgOrderValue: number;
+  lastOrderAt: string | null;
+  maxRiskScore: number;
+  segment: CustomerSegment;
+  isBlocked: boolean;
+  blockedReason: string | null;
+}
+
+export interface CustomerDetailResponse {
+  success: boolean;
+  customer: CustomerDetail;
+  orders: CustomerOrder[];
+}
+
+// ---- Notifications ----
+
+export interface NotificationLogEntry {
+  id: string;
+  orderId: string | null;
+  order: { orderNumber: string; customerName: string | null } | null;
+  channel: 'whatsapp' | 'sms';
+  recipient: string;
+  messageType: string;
+  body: string | null;
+  status: 'pending' | 'sent' | 'failed' | 'delivered';
+  error: string | null;
+  externalId: string | null;
+  retryCount: number;
+  sentAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationListResponse {
+  success: boolean;
+  logs: NotificationLogEntry[];
+  summary: { totalSent: number; totalFailed: number; totalPending: number };
+  pagination: { total: number; page: number; limit: number; pages: number };
 }

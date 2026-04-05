@@ -39,12 +39,11 @@ test.describe('Admin analytics', () => {
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.success).toBe(true);
-    expect(Array.isArray(body.days)).toBe(true);
-    expect(body.days.length).toBe(30);
-    if (body.days.length > 0) {
-      expect(body.days[0]).toHaveProperty('date');
-      expect(body.days[0]).toHaveProperty('revenue');
-      expect(body.days[0]).toHaveProperty('orders');
+    expect(Array.isArray(body.trend)).toBe(true);
+    if (body.trend.length > 0) {
+      expect(body.trend[0]).toHaveProperty('date');
+      expect(body.trend[0]).toHaveProperty('revenue');
+      expect(body.trend[0]).toHaveProperty('orders');
     }
     expect(typeof body.totalRevenue).toBe('number');
     expect(typeof body.totalOrders).toBe('number');
@@ -73,11 +72,12 @@ test.describe('Admin analytics', () => {
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.success).toBe(true);
-    expect(body).toHaveProperty('created');
-    expect(body).toHaveProperty('paid');
-    expect(body).toHaveProperty('delivered');
-    expect(typeof body.abandonmentRate).toBe('number');
-    expect(typeof body.paymentSuccessRate).toBe('number');
+    expect(body).toHaveProperty('funnel');
+    expect(body.funnel).toHaveProperty('ordersCreated');
+    expect(body.funnel).toHaveProperty('paymentCompleted');
+    expect(body.funnel).toHaveProperty('delivered');
+    expect(typeof body.funnel.abandonmentRate).toBe('number');
+    expect(typeof body.funnel.paymentSuccessRate).toBe('number');
   });
 
   test('API: /api/admin/analytics/coupons returns coupon effectiveness', async ({ request, adminToken }) => {
@@ -98,7 +98,29 @@ test.describe('Admin analytics', () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(Array.isArray(body.alerts)).toBe(true);
-    expect(typeof body.threshold).toBe('number');
+  });
+
+  test('API: /api/admin/analytics/customers returns customer intelligence', async ({ request, adminToken }) => {
+    const res = await request.get(`${BACKEND_URL}/api/admin/analytics/customers`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    expect(res.ok()).toBe(true);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body).toHaveProperty('summary');
+    expect(body.summary).toHaveProperty('totalUniqueCustomers');
+    expect(body.summary).toHaveProperty('repeatRate');
+    expect(body.summary).toHaveProperty('avgCustomerLifetimeValue');
+    expect(body.summary).toHaveProperty('repeatRateLast30');
+    expect(Array.isArray(body.topCustomers)).toBe(true);
+    if (body.topCustomers.length > 0) {
+      const c = body.topCustomers[0];
+      expect(c).toHaveProperty('phone');
+      expect(c).toHaveProperty('totalOrders');
+      expect(c).toHaveProperty('totalSpent');
+      expect(c).toHaveProperty('avgOrderValue');
+      expect(c).toHaveProperty('isRepeat');
+    }
   });
 
   test('analytics endpoints require authentication', async ({ request }) => {

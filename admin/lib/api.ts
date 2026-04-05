@@ -186,6 +186,7 @@ export const adminApi = {
     coupons: () => request<CouponAnalytics>('/api/admin/analytics/coupons'),
     fraud: (threshold?: number) =>
       request<FraudAlerts>(`/api/admin/analytics/fraud${threshold ? `?threshold=${threshold}` : ''}`),
+    customers: () => request<CustomerAnalytics>('/api/admin/analytics/customers'),
   },
 
   inventory: {
@@ -461,4 +462,31 @@ export interface InventoryIntelligence {
   fastMovers: FastMover[];
   deadStock: DeadStockItem[];
   deadStockValue: number;
+}
+
+export interface CustomerStat {
+  phone: string;
+  name: string | null;
+  totalOrders: number;
+  totalSpent: number;
+  totalDiscount: number;
+  avgOrderValue: number;
+  lastOrderAt: string | null;
+  isRepeat: boolean;
+}
+
+export interface CustomerAnalyticsSummary {
+  totalUniqueCustomers: number;
+  repeatCustomers: number;
+  repeatRate: number;
+  avgCustomerLifetimeValue: number;
+  newCustomersLast30: number;
+  repeatCustomersLast30: number;
+  repeatRateLast30: number;
+}
+
+export interface CustomerAnalytics {
+  success: boolean;
+  summary: CustomerAnalyticsSummary;
+  topCustomers: CustomerStat[];
 }

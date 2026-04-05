@@ -5,6 +5,7 @@ import { initiateSTKPush, verifyTransaction } from '../services/mpesa';
 import { generateIdempotencyKey, isRequestProcessed, markRequestProcessed } from '../utils/idempotency';
 import { logger, dbLog } from '../utils/logger';
 import { authenticate, authorize } from '../middleware/auth';
+import { sendPaymentConfirmation } from '../services/notifications';
 
 const router = Router();
 
@@ -130,13 +131,27 @@ router.post('/callback', async (req: Request, res: Response, next: NextFunction)
     });
 
     if (status === 'completed') {
-      await prisma.order.update({ where: { id: payment.orderId }, data: { status: 'paid' } });
+      const paidOrder = await prisma.order.update({
+        where: { id: payment.orderId },
+        data: { status: 'paid' },
+        select: { id: true, orderNumber: true, customerPhone: true, customerName: true, total: true },
+      });
       await prisma.activityLog.create({
         data: {
           orderId: payment.orderId,
           action: 'PAYMENT_CONFIRMED',
           details: JSON.stringify({ mpesaReceiptNumber, amount: payment.amount }),
         },
+      });
+
+      // Fire payment-confirmation notification (non-blocking)
+      sendPaymentConfirmation({
+        orderId: paidOrder.id,
+        orderNumber: paidOrder.orderNumber,
+        customerPhone: paidOrder.customerPhone,
+        customerName: paidOrder.customerName,
+        total: paidOrder.total,
+        mpesaReceiptNumber,
       });
     } else {
       await prisma.activityLog.create({

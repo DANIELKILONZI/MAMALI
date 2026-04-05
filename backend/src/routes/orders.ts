@@ -2,8 +2,10 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
+import { checkoutRateLimiter } from '../middleware/rateLimiter';
 import { logger } from '../utils/logger';
 import { assessOrderRisk } from '../services/fraud';
+import { sendOrderConfirmation, sendOrderCancellation } from '../services/notifications';
 
 const router = Router();
 
@@ -42,9 +44,11 @@ const STAFF_ALLOWED_TRANSITIONS: Record<string, string[]> = {
   processing: ['delivered'],
 };
 
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', checkoutRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = createOrderSchema.parse(req.body);
+    const ipAddress = (req.ip ?? req.socket?.remoteAddress ?? '').replace('::ffff:', '');
+    const userAgent = req.headers['user-agent'] ?? '';
 
     const order = await prisma.$transaction(async (tx) => {
       const products = await tx.product.findMany({
@@ -127,23 +131,40 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
           couponCode: resolvedCouponCode,
           total,
           expiresAt,
+          ipAddress: ipAddress || null,
+          userAgent: userAgent || null,
           items: { create: orderItems },
         },
         include: { items: { include: { product: { select: { id: true, name: true, slug: true } } } } },
       });
 
       await tx.activityLog.create({
-        data: { orderId: created.id, action: 'ORDER_CREATED', details: JSON.stringify({ total, itemCount: orderItems.length }) },
+        data: {
+          orderId: created.id,
+          action: 'ORDER_CREATED',
+          details: JSON.stringify({ total, itemCount: orderItems.length }),
+          ipAddress: ipAddress || null,
+        },
       });
 
       return created;
     });
 
     // Assess fraud risk after order is committed (non-blocking)
+    // Resolve the earliest product view time for rapid-checkout detection
+    const firstView = await prisma.productView.findFirst({
+      where: { productId: { in: data.items.map((i) => i.productId) } },
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true },
+    });
+
     assessOrderRisk({
       customerPhone: data.customerPhone,
       orderTotal: order.total,
       couponCode: data.couponCode,
+      ipAddress: ipAddress || undefined,
+      userAgent: userAgent || undefined,
+      firstViewedAt: firstView?.createdAt,
     }).then(async ({ riskScore, flags }) => {
       if (riskScore > 0) {
         await prisma.order.update({
@@ -156,6 +177,15 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       }
     }).catch((err) => {
       logger.error('Fraud assessment failed', err);
+    });
+
+    // Fire order-confirmation notification (non-blocking)
+    sendOrderConfirmation({
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      customerPhone: order.customerPhone,
+      customerName: order.customerName,
+      total: order.total,
     });
 
     res.status(201).json({ success: true, order });
@@ -270,6 +300,18 @@ router.put('/:id/status', authenticate, authorize('ADMIN', 'STAFF'), async (req:
     });
 
     logger.info(`Order ${order.orderNumber} status changed`, { from: order.status, to: status });
+
+    // Fire customer notification for cancellations (non-blocking)
+    if (status === 'cancelled') {
+      sendOrderCancellation({
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        customerPhone: order.customerPhone,
+        customerName: order.customerName,
+        total: order.total,
+      });
+    }
+
     res.json({ success: true, order: updated });
   } catch (err) {
     next(err);

@@ -79,13 +79,17 @@ model Order {
   expiresAt       DateTime?
   riskScore       Int         @default(0)
   riskFlags       String      @default("[]")
+  ipAddress       String?
+  userAgent       String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   activityLogs    ActivityLog[]
+  notifications   NotificationLog[]
 
   @@index([status])
   @@index([createdAt])
   @@index([riskScore])
+  @@index([customerPhone])
 }
 
 model OrderItem {
@@ -239,4 +243,43 @@ model ProductView {
   createdAt DateTime @default(now())
 
   @@index([productId, createdAt])
+}
+
+// Tracks abandoned checkout sessions for BI analytics
+model CheckoutSession {
+  id            String    @id @default(cuid())
+  sessionToken  String    @unique
+  customerPhone String?
+  cartItems     String    @default("[]")
+  cartValue     Float     @default(0)
+  isConverted   Boolean   @default(false)
+  orderId       String?
+  abandonedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([customerPhone])
+  @@index([isConverted, createdAt])
+}
+
+// Tracks WhatsApp and SMS notifications sent to customers
+model NotificationLog {
+  id          String    @id @default(cuid())
+  orderId     String?
+  order       Order?    @relation(fields: [orderId], references: [id])
+  channel     String    // 'whatsapp' | 'sms'
+  recipient   String
+  messageType String    // 'order_confirmed' | 'payment_confirmed' | 'order_shipped' | 'order_cancelled'
+  body        String?
+  status      String    @default("pending") // 'pending' | 'sent' | 'failed' | 'delivered'
+  error       String?
+  externalId  String?
+  retryCount  Int       @default(0)
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([status, createdAt])
+  @@index([recipient])
 }

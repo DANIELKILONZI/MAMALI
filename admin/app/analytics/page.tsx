@@ -8,6 +8,7 @@ import {
   FunnelAnalytics,
   CouponAnalytics,
   FraudAlerts,
+  CustomerAnalytics,
 } from '@/lib/api';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { withAuth } from '@/context/AuthContext';
@@ -42,6 +43,7 @@ function AnalyticsPage() {
   const [funnel, setFunnel] = useState<FunnelAnalytics | null>(null);
   const [coupons, setCoupons] = useState<CouponAnalytics | null>(null);
   const [fraud, setFraud] = useState<FraudAlerts | null>(null);
+  const [customers, setCustomers] = useState<CustomerAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -51,13 +53,15 @@ function AnalyticsPage() {
       adminApi.analytics.funnel(),
       adminApi.analytics.coupons(),
       adminApi.analytics.fraud(30),
+      adminApi.analytics.customers(),
     ])
-      .then(([r, p, f, c, fr]) => {
+      .then(([r, p, f, c, fr, cu]) => {
         setRevenue(r);
         setProducts(p);
         setFunnel(f);
         setCoupons(c);
         setFraud(fr);
+        setCustomers(cu);
       })
       .catch(() => toast.error('Failed to load analytics'))
       .finally(() => setLoading(false));
@@ -300,9 +304,111 @@ function AnalyticsPage() {
             )}
           </Section>
         )}
+
+        {/* --- Customer Intelligence --- */}
+        {customers && (
+          <Section title="👥 Customer Intelligence">
+            {/* Summary KPIs */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-xl font-bold text-gray-900">{customers.summary.totalUniqueCustomers}</p>
+                <p className="text-xs text-gray-500 mt-1">Total Customers</p>
+              </div>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <p className="text-xl font-bold text-gray-900">{KES(customers.summary.avgCustomerLifetimeValue)}</p>
+                <p className="text-xs text-gray-500 mt-1">Avg Lifetime Value</p>
+              </div>
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <p className="text-xl font-bold text-gray-900">{pct(customers.summary.repeatRate)}</p>
+                <p className="text-xs text-gray-500 mt-1">Repeat Rate (all‑time)</p>
+              </div>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-xl font-bold text-gray-900">{pct(customers.summary.repeatRateLast30)}</p>
+                <p className="text-xs text-gray-500 mt-1">Repeat Rate (30 days)</p>
+              </div>
+            </div>
+
+            {/* New vs Repeat last 30 days */}
+            <div className="mb-6">
+              <p className="text-sm font-medium text-gray-700 mb-2">New vs Repeat Customers — Last 30 days</p>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-500 w-14">New</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="bg-blue-500 h-3 rounded-full"
+                    style={{
+                      width: (customers.summary.newCustomersLast30 + customers.summary.repeatCustomersLast30) > 0
+                        ? `${(customers.summary.newCustomersLast30 / (customers.summary.newCustomersLast30 + customers.summary.repeatCustomersLast30)) * 100}%`
+                        : '0%',
+                    }}
+                  />
+                </div>
+                <span className="text-xs font-semibold text-gray-700 w-8 text-right">{customers.summary.newCustomersLast30}</span>
+              </div>
+              <div className="flex items-center gap-3 mt-2">
+                <span className="text-xs text-gray-500 w-14">Repeat</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="bg-green-500 h-3 rounded-full"
+                    style={{
+                      width: (customers.summary.newCustomersLast30 + customers.summary.repeatCustomersLast30) > 0
+                        ? `${(customers.summary.repeatCustomersLast30 / (customers.summary.newCustomersLast30 + customers.summary.repeatCustomersLast30)) * 100}%`
+                        : '0%',
+                    }}
+                  />
+                </div>
+                <span className="text-xs font-semibold text-gray-700 w-8 text-right">{customers.summary.repeatCustomersLast30}</span>
+              </div>
+            </div>
+
+            {/* Top customers table */}
+            {customers.topCustomers.length > 0 && (
+              <div className="overflow-x-auto">
+                <p className="text-sm font-medium text-gray-700 mb-2">Top Customers by Lifetime Spend</p>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-2 px-3 text-gray-500 font-medium">Customer</th>
+                      <th className="text-right py-2 px-3 text-gray-500 font-medium">Orders</th>
+                      <th className="text-right py-2 px-3 text-gray-500 font-medium">Total Spent</th>
+                      <th className="text-right py-2 px-3 text-gray-500 font-medium">Avg Order</th>
+                      <th className="text-right py-2 px-3 text-gray-500 font-medium">Discount Saved</th>
+                      <th className="text-left py-2 px-3 text-gray-500 font-medium">Type</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customers.topCustomers.slice(0, 20).map((c) => (
+                      <tr key={c.phone} className="border-b border-gray-50 hover:bg-gray-50">
+                        <td className="py-2 px-3">
+                          <p className="font-medium text-gray-800">{c.name ?? '—'}</p>
+                          <p className="text-xs text-gray-400">{c.phone}</p>
+                        </td>
+                        <td className="py-2 px-3 text-right text-gray-700">{c.totalOrders}</td>
+                        <td className="py-2 px-3 text-right font-semibold text-green-700">{KES(c.totalSpent)}</td>
+                        <td className="py-2 px-3 text-right text-gray-600">{KES(c.avgOrderValue)}</td>
+                        <td className="py-2 px-3 text-right text-blue-600">{c.totalDiscount > 0 ? KES(c.totalDiscount) : '—'}</td>
+                        <td className="py-2 px-3">
+                          {c.isRepeat ? (
+                            <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Repeat</span>
+                          ) : (
+                            <span className="inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">New</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {customers.topCustomers.length === 0 && (
+              <p className="text-gray-400 text-sm mt-4">No customer data yet.</p>
+            )}
+          </Section>
+        )}
       </div>
     </AdminLayout>
   );
 }
 
 export default withAuth(AnalyticsPage);
+

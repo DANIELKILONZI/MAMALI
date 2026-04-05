@@ -226,4 +226,118 @@ router.get('/fraud', authenticate, authorize('ADMIN'), async (req: Request, res:
   }
 });
 
+// GET /api/admin/analytics/customers — customer intelligence (revenue per customer, repeat rate, CLV)
+router.get('/customers', authenticate, authorize('ADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const PAID_STATUSES = ['paid', 'processing', 'delivered'] as const;
+
+    // Aggregate all-time orders per customer phone
+    const allTimeCustomers = await prisma.order.groupBy({
+      by: ['customerPhone'],
+      where: { status: { in: [...PAID_STATUSES] } },
+      _sum: { total: true, discountAmount: true },
+      _count: { id: true },
+      _max: { createdAt: true },
+      orderBy: { _sum: { total: 'desc' } },
+      take: 50,
+    });
+
+    // Get customer names (most recent name per phone)
+    const phones = allTimeCustomers.map((c) => c.customerPhone);
+    const latestOrders = await prisma.order.findMany({
+      where: { customerPhone: { in: phones }, status: { in: [...PAID_STATUSES] } },
+      select: { customerPhone: true, customerName: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    const nameMap = new Map<string, string>();
+    for (const o of latestOrders) {
+      if (!nameMap.has(o.customerPhone) && o.customerName) {
+        nameMap.set(o.customerPhone, o.customerName);
+      }
+    }
+
+    const topCustomers = allTimeCustomers.map((c) => ({
+      phone: c.customerPhone,
+      name: nameMap.get(c.customerPhone) ?? null,
+      totalOrders: c._count.id,
+      totalSpent: Math.round((c._sum.total ?? 0) * 100) / 100,
+      totalDiscount: Math.round((c._sum.discountAmount ?? 0) * 100) / 100,
+      avgOrderValue: c._count.id > 0
+        ? Math.round(((c._sum.total ?? 0) / c._count.id) * 100) / 100
+        : 0,
+      lastOrderAt: c._max.createdAt,
+      isRepeat: c._count.id >= 2,
+    }));
+
+    // Count unique customers and repeat customers (all-time)
+    const [totalUniqueCustomers, repeatCustomers] = await Promise.all([
+      prisma.order.groupBy({
+        by: ['customerPhone'],
+        where: { status: { in: [...PAID_STATUSES] } },
+      }).then((r) => r.length),
+      prisma.order.groupBy({
+        by: ['customerPhone'],
+        where: { status: { in: [...PAID_STATUSES] } },
+        having: { customerPhone: { _count: { gte: 2 } } },
+      }).then((r) => r.length),
+    ]);
+
+    // New vs repeat in last 30 days
+    const [newCustomersLast30, allCustomersLast30] = await Promise.all([
+      // New = phone had no paid order before 30 days ago
+      prisma.$queryRaw<{ count: bigint }[]>`
+        SELECT COUNT(DISTINCT o.customerPhone) as count
+        FROM "Order" o
+        WHERE o.status IN ('paid', 'processing', 'delivered')
+          AND o.createdAt >= ${thirtyDaysAgo}
+          AND NOT EXISTS (
+            SELECT 1 FROM "Order" o2
+            WHERE o2.customerPhone = o.customerPhone
+              AND o2.status IN ('paid', 'processing', 'delivered')
+              AND o2.createdAt < ${thirtyDaysAgo}
+          )
+      `.then((r) => Number(r[0]?.count ?? 0)),
+      prisma.order.groupBy({
+        by: ['customerPhone'],
+        where: { status: { in: [...PAID_STATUSES] }, createdAt: { gte: thirtyDaysAgo } },
+      }).then((r) => r.length),
+    ]);
+
+    const repeatCustomersLast30 = allCustomersLast30 - newCustomersLast30;
+    const repeatRate = allCustomersLast30 > 0
+      ? Math.round((repeatCustomersLast30 / allCustomersLast30) * 10000) / 100
+      : 0;
+
+    // Customer lifetime value (average total spent per unique paying customer)
+    const clvResult = await prisma.order.aggregate({
+      where: { status: { in: [...PAID_STATUSES] } },
+      _sum: { total: true },
+      _count: { id: true },
+    });
+    const clv = totalUniqueCustomers > 0
+      ? Math.round(((clvResult._sum.total ?? 0) / totalUniqueCustomers) * 100) / 100
+      : 0;
+
+    res.json({
+      success: true,
+      summary: {
+        totalUniqueCustomers,
+        repeatCustomers,
+        repeatRate: totalUniqueCustomers > 0
+          ? Math.round((repeatCustomers / totalUniqueCustomers) * 10000) / 100
+          : 0,
+        avgCustomerLifetimeValue: clv,
+        newCustomersLast30,
+        repeatCustomersLast30,
+        repeatRateLast30: repeatRate,
+      },
+      topCustomers,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
+

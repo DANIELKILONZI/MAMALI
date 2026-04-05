@@ -9,9 +9,13 @@ interface StockItem {
 }
 
 export async function checkAvailability(items: StockItem[]): Promise<{ available: boolean; outOfStock: string[] }> {
+  const products = await prisma.product.findMany({
+    where: { id: { in: items.map((i) => i.productId) } },
+  });
+  const productMap = new Map(products.map((p) => [p.id, p]));
   const outOfStock: string[] = [];
   for (const item of items) {
-    const product = await prisma.product.findUnique({ where: { id: item.productId } });
+    const product = productMap.get(item.productId);
     if (!product || !product.isActive || product.stock < item.quantity) {
       outOfStock.push(item.productId);
     }

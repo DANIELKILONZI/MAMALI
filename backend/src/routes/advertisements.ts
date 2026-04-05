@@ -75,8 +75,8 @@ adminRouter.put('/:id', authenticate, authorize('ADMIN'), async (req: Request, r
       where: { id: String(req.params.id) },
       data: {
         ...data,
-        startsAt: data.startsAt ? new Date(data.startsAt) : data.startsAt,
-        endsAt: data.endsAt ? new Date(data.endsAt) : data.endsAt,
+        startsAt: data.startsAt !== undefined ? (data.startsAt ? new Date(data.startsAt) : null) : undefined,
+        endsAt: data.endsAt !== undefined ? (data.endsAt ? new Date(data.endsAt) : null) : undefined,
       },
     });
     res.json({ success: true, advertisement: ad });

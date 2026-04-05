@@ -67,7 +67,9 @@ export async function getDashboardStats() {
   const monthRevenueVal = monthRevenue._sum.total || 0;
   const lastMonthRevenueVal = lastMonthRevenue._sum.total || 0;
   const revenueGrowth =
-    lastMonthRevenueVal === 0
+    lastMonthRevenueVal === 0 && monthRevenueVal === 0
+      ? 0
+      : lastMonthRevenueVal === 0
       ? 100
       : ((monthRevenueVal - lastMonthRevenueVal) / lastMonthRevenueVal) * 100;
 

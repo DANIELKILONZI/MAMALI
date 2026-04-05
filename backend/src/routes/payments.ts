@@ -134,7 +134,12 @@ router.post('/callback', async (req: Request, res: Response, next: NextFunction)
     res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
   } catch (err) {
     logger.error('Error processing M-Pesa callback', err);
-    res.json({ ResultCode: 0, ResultDesc: 'Accepted' }); // Always return success to M-Pesa
+    // Always return ResultCode 0 (success) to Safaricom even on internal errors.
+    // If we return a non-zero code, Safaricom will retry the callback repeatedly,
+    // which can cause duplicate processing. Instead we log the error and rely on
+    // the /payments/:orderId/status query endpoint (via verifyTransaction) for
+    // recovery when the customer polls for their payment result.
+    res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
   }
 });
 

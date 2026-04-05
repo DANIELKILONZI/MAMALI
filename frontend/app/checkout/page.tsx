@@ -24,6 +24,20 @@ function validateKenyanPhone(phone: string): string | null {
   return null;
 }
 
+/**
+ * CheckoutPage — multi-step checkout with M-Pesa STK push payment.
+ *
+ * State transitions:
+ *   'form'            — customer fills name + phone, submits order
+ *   'pending_payment' — order created, STK push sent, polling payment status
+ *   'done'            — payment confirmed (paid) or max polls reached (fallback)
+ *
+ * Payment polling:
+ *   Polls GET /api/payments/:orderId/status every POLL_INTERVAL_MS (3 s),
+ *   up to MAX_POLLS (10) times (30 s total). If payment is not confirmed by
+ *   then, the user is shown a manual "check your phone" message and directed
+ *   to their order status page.
+ */
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, clearCart } = useCart();

@@ -23,8 +23,9 @@ router.get('/intelligence', authenticate, authorize('ADMIN'), async (_req: Reque
       .slice(0, 20);
 
     // --- Fast movers: highest units sold in last 7 days ---
+    // Group only by productId to avoid separate groups when product names changed
     const fastMoversRaw = await prisma.orderItem.groupBy({
-      by: ['productId', 'name'],
+      by: ['productId'],
       where: {
         order: {
           status: { in: ['paid', 'processing', 'delivered'] },
@@ -36,20 +37,20 @@ router.get('/intelligence', authenticate, authorize('ADMIN'), async (_req: Reque
       take: 10,
     });
 
-    // Enrich fast movers with stock info
+    // Enrich fast movers with current product names and stock info
     const fastMoverIds = fastMoversRaw.map((f) => f.productId);
     const fastMoverProducts = await prisma.product.findMany({
       where: { id: { in: fastMoverIds } },
-      select: { id: true, stock: true, reorderLevel: true },
+      select: { id: true, name: true, stock: true, reorderLevel: true },
     });
-    const fastMoverStockMap = new Map(fastMoverProducts.map((p) => [p.id, p]));
+    const fastMoverProductMap = new Map(fastMoverProducts.map((p) => [p.id, p]));
 
     const fastMovers = fastMoversRaw.map((f) => ({
       productId: f.productId,
-      name: f.name,
+      name: fastMoverProductMap.get(f.productId)?.name ?? 'Unknown',
       unitsSoldLast7Days: f._sum.quantity ?? 0,
-      currentStock: fastMoverStockMap.get(f.productId)?.stock ?? 0,
-      reorderLevel: fastMoverStockMap.get(f.productId)?.reorderLevel ?? 5,
+      currentStock: fastMoverProductMap.get(f.productId)?.stock ?? 0,
+      reorderLevel: fastMoverProductMap.get(f.productId)?.reorderLevel ?? 5,
     }));
 
     // --- Dead stock: active products with stock > 0 and no sales in last 30 days ---

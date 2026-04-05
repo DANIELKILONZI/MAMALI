@@ -83,13 +83,27 @@ router.get('/products', authenticate, authorize('ADMIN'), async (_req: Request, 
     });
     const viewMap = new Map(viewCounts.map((v) => [v.productId, v._count.id]));
 
+    // Order count (distinct orders) per product in last 30 days
+    const recentOrderCounts = await prisma.orderItem.groupBy({
+      by: ['productId'],
+      where: {
+        order: {
+          status: { in: ['paid', 'processing', 'delivered'] },
+          createdAt: { gte: thirtyDaysAgo },
+        },
+      },
+      _count: { orderId: true },
+    });
+    const recentOrderCountMap = new Map(recentOrderCounts.map((r) => [r.productId, r._count.orderId]));
+
     const products = allTimeItems.map((item) => {
       const recent = recentMap.get(item.productId);
       const views = viewMap.get(item.productId) ?? 0;
       const salesLast30 = recent?._sum.quantity ?? 0;
       const revenueLast30 = recent?._sum.total ?? 0;
-      // Conversion = orders / views in last 30 days (if views > 0)
-      const conversionRate = views > 0 ? ((item._count.orderId / views) * 100) : null;
+      const ordersLast30 = recentOrderCountMap.get(item.productId) ?? 0;
+      // Conversion = distinct orders last 30d / views last 30d (matching time windows)
+      const conversionRate = views > 0 ? ((ordersLast30 / views) * 100) : null;
       return {
         productId: item.productId,
         name: item.name,

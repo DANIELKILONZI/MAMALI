@@ -273,7 +273,8 @@ function AnalyticsPage() {
                   </thead>
                   <tbody>
                     {fraud.alerts.map((a) => {
-                      const flags: string[] = JSON.parse(a.riskFlags ?? '[]');
+                      let flags: string[] = [];
+                      try { flags = JSON.parse(a.riskFlags ?? '[]'); } catch { flags = []; }
                       return (
                         <tr key={a.id} className="border-b border-gray-50 hover:bg-red-50">
                           <td className="py-2 px-3 font-mono text-blue-600">{a.orderNumber}</td>

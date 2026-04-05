@@ -2,7 +2,6 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
-import { checkAvailability, reserveStock } from '../services/inventory';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -44,52 +43,77 @@ const STAFF_ALLOWED_TRANSITIONS: Record<string, string[]> = {
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = createOrderSchema.parse(req.body);
-    const products = await prisma.product.findMany({
-      where: { id: { in: data.items.map((i) => i.productId) }, isActive: true },
-    });
-    if (products.length !== data.items.length) {
-      res.status(400).json({ success: false, message: 'One or more products not found or inactive' });
-      return;
-    }
 
-    const { available, outOfStock } = await checkAvailability(data.items);
-    if (!available) {
-      res.status(400).json({ success: false, message: 'Insufficient stock', outOfStock });
-      return;
-    }
+    const order = await prisma.$transaction(async (tx) => {
+      const products = await tx.product.findMany({
+        where: { id: { in: data.items.map((i) => i.productId) }, isActive: true },
+      });
+      if (products.length !== data.items.length) {
+        throw Object.assign(new Error('One or more products not found or inactive'), { statusCode: 400 });
+      }
 
-    await reserveStock(data.items);
+      // Check availability within transaction
+      const outOfStock: string[] = [];
+      for (const item of data.items) {
+        const product = products.find((p) => p.id === item.productId);
+        if (!product || product.stock < item.quantity) {
+          outOfStock.push(item.productId);
+        }
+      }
+      if (outOfStock.length > 0) {
+        throw Object.assign(new Error('Insufficient stock'), { statusCode: 400, outOfStock });
+      }
 
-    const orderItems = data.items.map((item) => {
-      const product = products.find((p) => p.id === item.productId)!;
-      const price = product.price - (product.price * product.discount) / 100;
-      return { productId: item.productId, name: product.name, price, quantity: item.quantity, total: price * item.quantity };
-    });
+      // Reserve stock within transaction
+      for (const item of data.items) {
+        const product = await tx.product.findUnique({ where: { id: item.productId } });
+        if (!product || product.stock < item.quantity) {
+          throw Object.assign(new Error(`Insufficient stock for product ${item.productId}`), { statusCode: 400 });
+        }
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } },
+        });
+      }
 
-    const subtotal = orderItems.reduce((s, i) => s + i.total, 0);
-    const total = subtotal;
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min
+      const orderItems = data.items.map((item) => {
+        const product = products.find((p) => p.id === item.productId)!;
+        const price = product.price - (product.price * product.discount) / 100;
+        return { productId: item.productId, name: product.name, price, quantity: item.quantity, total: price * item.quantity };
+      });
 
-    const order = await prisma.order.create({
-      data: {
-        orderNumber: generateOrderNumber(),
-        customerPhone: data.customerPhone,
-        customerName: data.customerName,
-        notes: data.notes,
-        subtotal,
-        total,
-        expiresAt,
-        items: { create: orderItems },
-      },
-      include: { items: { include: { product: { select: { id: true, name: true, slug: true } } } } },
-    });
+      const subtotal = orderItems.reduce((s, i) => s + i.total, 0);
+      const total = subtotal;
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
-    await prisma.activityLog.create({
-      data: { orderId: order.id, action: 'ORDER_CREATED', details: JSON.stringify({ total, itemCount: orderItems.length }) },
+      const created = await tx.order.create({
+        data: {
+          orderNumber: generateOrderNumber(),
+          customerPhone: data.customerPhone,
+          customerName: data.customerName,
+          notes: data.notes,
+          subtotal,
+          total,
+          expiresAt,
+          items: { create: orderItems },
+        },
+        include: { items: { include: { product: { select: { id: true, name: true, slug: true } } } } },
+      });
+
+      await tx.activityLog.create({
+        data: { orderId: created.id, action: 'ORDER_CREATED', details: JSON.stringify({ total, itemCount: orderItems.length }) },
+      });
+
+      return created;
     });
 
     res.status(201).json({ success: true, order });
-  } catch (err) {
+  } catch (err: unknown) {
+    const e = err as { statusCode?: number; outOfStock?: string[]; message?: string };
+    if (e.statusCode === 400) {
+      res.status(400).json({ success: false, message: e.message, outOfStock: e.outOfStock });
+      return;
+    }
     next(err);
   }
 });

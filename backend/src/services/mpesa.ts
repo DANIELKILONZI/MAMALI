@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 
@@ -7,15 +7,40 @@ const BASE_URL =
     ? 'https://api.safaricom.co.ke'
     : 'https://sandbox.safaricom.co.ke';
 
-export async function getAccessToken(): Promise<string> {
-  const credentials = Buffer.from(
-    `${env.MPESA_CONSUMER_KEY}:${env.MPESA_CONSUMER_SECRET}`
-  ).toString('base64');
+async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+  const delays = [1000, 2000, 4000];
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const axiosErr = err as AxiosError;
+      // Do not retry on 4xx responses
+      if (axiosErr.response && axiosErr.response.status >= 400 && axiosErr.response.status < 500) {
+        throw err;
+      }
+      lastErr = err;
+      if (attempt < delays.length) {
+        logger.warn(`${label}: attempt ${attempt + 1} failed, retrying in ${delays[attempt]}ms`, {
+          message: axiosErr.message,
+        });
+        await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+      }
+    }
+  }
+  throw lastErr;
+}
 
-  const response = await axios.get(`${BASE_URL}/oauth/v1/generate?grant_type=client_credentials`, {
-    headers: { Authorization: `Basic ${credentials}` },
-  });
-  return response.data.access_token as string;
+export async function getAccessToken(): Promise<string> {
+  return withRetry(async () => {
+    const credentials = Buffer.from(
+      `${env.MPESA_CONSUMER_KEY}:${env.MPESA_CONSUMER_SECRET}`
+    ).toString('base64');
+    const response = await axios.get(`${BASE_URL}/oauth/v1/generate?grant_type=client_credentials`, {
+      headers: { Authorization: `Basic ${credentials}` },
+    });
+    return response.data.access_token as string;
+  }, 'getAccessToken');
 }
 
 export function formatPhoneNumber(phone: string): string {
@@ -50,38 +75,40 @@ export async function initiateSTKPush(
   amount: number,
   orderId: string
 ): Promise<STKPushResult> {
-  const accessToken = await getAccessToken();
-  const timestamp = getTimestamp();
-  const password = getPassword(timestamp);
-  const formattedPhone = formatPhoneNumber(phone);
+  return withRetry(async () => {
+    const accessToken = await getAccessToken();
+    const timestamp = getTimestamp();
+    const password = getPassword(timestamp);
+    const formattedPhone = formatPhoneNumber(phone);
 
-  const payload = {
-    BusinessShortCode: env.MPESA_SHORTCODE,
-    Password: password,
-    Timestamp: timestamp,
-    TransactionType: 'CustomerPayBillOnline',
-    Amount: Math.ceil(amount),
-    PartyA: formattedPhone,
-    PartyB: env.MPESA_SHORTCODE,
-    PhoneNumber: formattedPhone,
-    CallBackURL: env.MPESA_CALLBACK_URL,
-    AccountReference: orderId,
-    TransactionDesc: `Payment for order ${orderId}`,
-  };
+    const payload = {
+      BusinessShortCode: env.MPESA_SHORTCODE,
+      Password: password,
+      Timestamp: timestamp,
+      TransactionType: 'CustomerPayBillOnline',
+      Amount: Math.ceil(amount),
+      PartyA: formattedPhone,
+      PartyB: env.MPESA_SHORTCODE,
+      PhoneNumber: formattedPhone,
+      CallBackURL: env.MPESA_CALLBACK_URL,
+      AccountReference: orderId,
+      TransactionDesc: `Payment for order ${orderId}`,
+    };
 
-  logger.info('Initiating STK Push', { phone: formattedPhone, amount, orderId });
+    logger.info('Initiating STK Push', { phone: formattedPhone, amount, orderId });
 
-  const response = await axios.post(`${BASE_URL}/mpesa/stkpush/v1/processrequest`, payload, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+    const response = await axios.post(`${BASE_URL}/mpesa/stkpush/v1/processrequest`, payload, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
 
-  return {
-    merchantRequestId: response.data.MerchantRequestID,
-    checkoutRequestId: response.data.CheckoutRequestID,
-    responseCode: response.data.ResponseCode,
-    responseDescription: response.data.ResponseDescription,
-    customerMessage: response.data.CustomerMessage,
-  };
+    return {
+      merchantRequestId: response.data.MerchantRequestID,
+      checkoutRequestId: response.data.CheckoutRequestID,
+      responseCode: response.data.ResponseCode,
+      responseDescription: response.data.ResponseDescription,
+      customerMessage: response.data.CustomerMessage,
+    };
+  }, 'initiateSTKPush');
 }
 
 export async function verifyTransaction(checkoutRequestId: string): Promise<unknown> {
@@ -102,3 +129,4 @@ export async function verifyTransaction(checkoutRequestId: string): Promise<unkn
 
   return response.data;
 }
+

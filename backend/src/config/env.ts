@@ -13,4 +13,11 @@ export const env = {
   MPESA_PASSKEY: process.env.MPESA_PASSKEY || '',
   MPESA_CALLBACK_URL: process.env.MPESA_CALLBACK_URL || '',
   MPESA_ENVIRONMENT: (process.env.MPESA_ENVIRONMENT || 'sandbox') as 'sandbox' | 'production',
+  REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET || 'refresh-secret-change-in-production',
+  REFRESH_TOKEN_EXPIRES_IN: process.env.REFRESH_TOKEN_EXPIRES_IN || '30d',
+  CORS_ORIGINS: process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3001',
+  LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+  LOG_TO_FILE: process.env.LOG_TO_FILE === 'true',
+  ENABLE_DB_LOGS: process.env.ENABLE_DB_LOGS !== 'false',
 };
+

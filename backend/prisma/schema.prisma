@@ -8,16 +8,17 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  password     String
-  role         String   @default("STAFF")
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  orders       Order[]  @relation("AssignedOrders")
-  activityLogs ActivityLog[]
+  id             String         @id @default(cuid())
+  name           String
+  email          String         @unique
+  password       String
+  role           String         @default("STAFF")
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  orders         Order[]        @relation("AssignedOrders")
+  activityLogs   ActivityLog[]
+  refreshTokens  RefreshToken[]
 }
 
 model Category {
@@ -36,21 +37,26 @@ model Category {
 }
 
 model Product {
-  id          String       @id @default(cuid())
-  name        String
-  slug        String       @unique
-  description String?
-  price       Float
-  discount    Float        @default(0)
-  stock       Int          @default(0)
-  images      String       @default("[]")
-  categoryId  String?
-  category    Category?    @relation(fields: [categoryId], references: [id])
-  isActive    Boolean      @default(true)
-  isFeatured  Boolean      @default(false)
-  orderItems  OrderItem[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id              String       @id @default(cuid())
+  name            String
+  slug            String       @unique
+  description     String?
+  price           Float
+  discount        Float        @default(0)
+  stock           Int          @default(0)
+  images          String       @default("[]")
+  categoryId      String?
+  category        Category?    @relation(fields: [categoryId], references: [id])
+  isActive        Boolean      @default(true)
+  isFeatured      Boolean      @default(false)
+  discountEndsAt  DateTime?
+  boostScore      Int          @default(0)
+  orderItems      OrderItem[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([categoryId])
+  @@index([isActive, isFeatured])
 }
 
 model Order {
@@ -70,6 +76,9 @@ model Order {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   activityLogs    ActivityLog[]
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 model OrderItem {
@@ -100,6 +109,9 @@ model Payment {
   idempotencyKey     String   @unique
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
 }
 
 model Advertisement {
@@ -149,4 +161,38 @@ model ActivityLog {
   details   String?
   ipAddress String?
   createdAt DateTime @default(now())
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  ip        String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String
+  category  String
+  message   String
+  details   String?
+  userId    String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([level, createdAt])
+  @@index([category, createdAt])
 }

@@ -3,7 +3,8 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { initiateSTKPush, verifyTransaction } from '../services/mpesa';
 import { generateIdempotencyKey, isRequestProcessed, markRequestProcessed } from '../utils/idempotency';
-import { logger } from '../utils/logger';
+import { logger, dbLog } from '../utils/logger';
+import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
@@ -22,6 +23,22 @@ router.post('/initiate', async (req: Request, res: Response, next: NextFunction)
     }
     if (!['pending', 'awaiting_payment'].includes(order.status)) {
       res.status(400).json({ success: false, message: 'Order cannot accept payment in current status' });
+      return;
+    }
+
+    // Check order expiry
+    if (order.expiresAt && order.expiresAt < new Date()) {
+      res.status(400).json({ success: false, message: 'Order has expired' });
+      return;
+    }
+
+    // Duplicate STK push prevention: pending payment in last 2 minutes
+    const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000);
+    const recentPending = await prisma.payment.findFirst({
+      where: { orderId, status: 'pending', createdAt: { gte: twoMinsAgo } },
+    });
+    if (recentPending) {
+      res.json({ success: true, payment: recentPending, message: 'Payment already in progress, check your phone' });
       return;
     }
 
@@ -129,6 +146,11 @@ router.post('/callback', async (req: Request, res: Response, next: NextFunction)
           details: JSON.stringify({ resultCode: ResultCode, resultDesc: ResultDesc }),
         },
       });
+      await dbLog('warn', 'PAYMENT', 'M-Pesa payment failed via callback', {
+        orderId: payment.orderId,
+        resultCode: ResultCode,
+        resultDesc: ResultDesc,
+      });
     }
 
     res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
@@ -160,6 +182,56 @@ router.get('/:orderId/status', async (req: Request, res: Response, next: NextFun
       }
     }
     res.json({ success: true, payment });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const reconcileSchema = z.object({
+  orderIds: z.array(z.string()).optional(),
+});
+
+router.post('/reconcile', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { orderIds } = reconcileSchema.parse(req.body);
+
+    const where: Record<string, unknown> = { status: 'pending' };
+    if (orderIds && orderIds.length > 0) {
+      where.orderId = { in: orderIds };
+    }
+
+    const pendingPayments = await prisma.payment.findMany({
+      where: { ...where, checkoutRequestId: { not: null } },
+    });
+
+    const results: { paymentId: string; orderId: string; status: string; action: string }[] = [];
+
+    for (const payment of pendingPayments) {
+      try {
+        const mpesaResult = await verifyTransaction(payment.checkoutRequestId!);
+        const result = mpesaResult as Record<string, unknown>;
+        const resultCode = result.ResultCode ?? result.ResponseCode;
+        const newStatus = resultCode === '0' || resultCode === 0 ? 'completed' : 'failed';
+
+        if (newStatus !== payment.status) {
+          await prisma.payment.update({
+            where: { id: payment.id },
+            data: { status: newStatus, resultCode: String(resultCode) },
+          });
+          if (newStatus === 'completed') {
+            await prisma.order.update({ where: { id: payment.orderId }, data: { status: 'paid' } });
+          }
+          results.push({ paymentId: payment.id, orderId: payment.orderId, status: newStatus, action: 'updated' });
+        } else {
+          results.push({ paymentId: payment.id, orderId: payment.orderId, status: payment.status, action: 'unchanged' });
+        }
+      } catch (err) {
+        logger.error(`Reconciliation failed for payment ${payment.id}`, err);
+        results.push({ paymentId: payment.id, orderId: payment.orderId, status: payment.status, action: 'error' });
+      }
+    }
+
+    res.json({ success: true, reconciled: results.length, results });
   } catch (err) {
     next(err);
   }

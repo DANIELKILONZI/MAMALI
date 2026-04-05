@@ -91,14 +91,24 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       if (data.couponCode) {
         const coupon = await tx.coupon.findUnique({ where: { code: data.couponCode.toUpperCase() } });
         if (coupon && coupon.isActive && (!coupon.expiresAt || coupon.expiresAt >= new Date()) &&
-            (coupon.maxUses === null || coupon.usedCount < coupon.maxUses) &&
             subtotal >= coupon.minOrderValue) {
-          discountAmount = coupon.discountType === 'percent'
-            ? Math.min(subtotal, (subtotal * coupon.discountValue) / 100)
-            : Math.min(subtotal, coupon.discountValue);
-          discountAmount = Math.round(discountAmount * 100) / 100;
-          resolvedCouponCode = coupon.code;
-          await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });
+          // Atomically increment usedCount only if still under the limit.
+          // Using updateMany with usedCount < maxUses in the WHERE clause ensures
+          // the check-and-increment is a single atomic database operation.
+          const usedCountWhere = coupon.maxUses !== null
+            ? { usedCount: { lt: coupon.maxUses } }
+            : {};
+          const updated = await tx.coupon.updateMany({
+            where: { id: coupon.id, isActive: true, ...usedCountWhere },
+            data: { usedCount: { increment: 1 } },
+          });
+          if (updated.count > 0) {
+            discountAmount = coupon.discountType === 'percent'
+              ? Math.min(subtotal, (subtotal * coupon.discountValue) / 100)
+              : Math.min(subtotal, coupon.discountValue);
+            discountAmount = Math.round(discountAmount * 100) / 100;
+            resolvedCouponCode = coupon.code;
+          }
         }
       }
 

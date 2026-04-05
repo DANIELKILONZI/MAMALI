@@ -77,6 +77,56 @@ k6 run load-tests/concurrent-checkout.k6.js
 
 ---
 
+### 4. Late Payment Callback (`late-payment-callback.k6.js`)
+Simulates M-Pesa callbacks arriving late (seconds to minutes after the STK push).
+Tests that the payment callback endpoint handles concurrent, delayed, and expired
+callbacks gracefully — no 500 errors, no DB corruption.
+
+```bash
+BASE_URL=http://localhost:5000 \
+PRODUCT_ID=<product-with-1000-stock> \
+k6 run load-tests/late-payment-callback.k6.js
+```
+
+**Scenario phases:**
+| Phase | VUs | Start time |
+|-------|-----|-----------|
+| `checkout_burst` — 100 orders | 100 | 0 s |
+| `on_time_callbacks` — callbacks arrive shortly after checkout | 80 | 35 s |
+| `late_callbacks` — callbacks after order expiry window | 40 | 70 s |
+
+**Thresholds:**
+- No 5xx responses from the callback endpoint
+- Callback p95 latency < 3 s
+- `callbacks_server_errors` count == 0
+
+---
+
+### 5. Notification Retry Load (`notification-retry.k6.js`)
+Simulates a burst of notification retry requests — e.g. when a WhatsApp/SMS
+provider recovers after an outage or an admin triggers "retry all failed".
+
+```bash
+BASE_URL=http://localhost:5000 \
+PRODUCT_ID=<product-id> \
+ADMIN_TOKEN=<admin-jwt-token> \
+k6 run load-tests/notification-retry.k6.js
+```
+
+**Scenario phases:**
+| Phase | VUs | Start time |
+|-------|-----|-----------|
+| `fill_notification_queue` — 20 orders/s for 30 s | 30–50 | 0 s |
+| `read_notification_list` — admin reading the notifications page concurrently | 20 | 10 s |
+| `bulk_resend_burst` — 100 resend requests in quick succession | 30 | 35 s |
+
+**Thresholds:**
+- Notification list API p95 < 2 s
+- Zero 5xx errors
+- `notification_list_failed` count == 0
+
+---
+
 ## Interpreting Results
 
 ```

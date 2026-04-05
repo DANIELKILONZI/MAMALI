@@ -6,12 +6,18 @@ import { useAuth } from '@/context/AuthContext';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { href: '/analytics', label: 'Analytics', icon: '📈' },
   { href: '/products', label: 'Products', icon: '📦' },
   { href: '/categories', label: 'Categories', icon: '🗂️' },
   { href: '/orders', label: 'Orders', icon: '🛒' },
+  { href: '/customers', label: 'Customers', icon: '👥' },
+  { href: '/inventory', label: 'Inventory', icon: '🏭' },
+  { href: '/coupons', label: 'Coupons', icon: '🎟️' },
   { href: '/advertisements', label: 'Advertisements', icon: '📢' },
+  { href: '/notifications', label: 'Notifications', icon: '🔔' },
   { href: '/content', label: 'Content', icon: '📄' },
   { href: '/homepage', label: 'Homepage', icon: '🏠' },
+  { href: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

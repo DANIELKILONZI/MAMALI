@@ -11,11 +11,14 @@ const productSchema = z.object({
   description: z.string().optional(),
   price: z.number().positive(),
   discount: z.number().min(0).max(100).default(0),
+  discountEndsAt: z.string().datetime().nullable().optional(),
   stock: z.number().int().min(0).default(0),
+  reorderLevel: z.number().int().min(0).default(5),
   images: z.array(z.string()).default([]),
   categoryId: z.string().optional().nullable(),
   isActive: z.boolean().default(true),
   isFeatured: z.boolean().default(false),
+  boostScore: z.number().int().min(0).default(0),
 });
 
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
@@ -43,7 +46,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         skip,
         take,
         include: { category: { select: { id: true, name: true, slug: true } } },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ boostScore: 'desc' }, { createdAt: 'desc' }],
       }),
       prisma.product.count({ where }),
     ]);
@@ -83,7 +86,11 @@ router.post('/', authenticate, authorize('ADMIN'), async (req: Request, res: Res
       return;
     }
     const product = await prisma.product.create({
-      data: { ...data, images: JSON.stringify(data.images) },
+      data: {
+        ...data,
+        images: JSON.stringify(data.images),
+        discountEndsAt: data.discountEndsAt ? new Date(data.discountEndsAt) : null,
+      },
       include: { category: { select: { id: true, name: true, slug: true } } },
     });
     res.status(201).json({ success: true, product: { ...product, images: JSON.parse(product.images) } });
@@ -106,6 +113,9 @@ router.put('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: R
     }
     const updateData: Record<string, unknown> = { ...data };
     if (data.images) updateData.images = JSON.stringify(data.images);
+    if (data.discountEndsAt !== undefined) {
+      updateData.discountEndsAt = data.discountEndsAt ? new Date(data.discountEndsAt) : null;
+    }
     const product = await prisma.product.update({
       where: { id: String(req.params.id) },
       data: updateData,
@@ -121,6 +131,22 @@ router.delete('/:id', authenticate, authorize('ADMIN'), async (req: Request, res
   try {
     await prisma.product.update({ where: { id: String(req.params.id) }, data: { isActive: false } });
     res.json({ success: true, message: 'Product deactivated' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Public: record a product view (fire-and-forget by clients)
+router.post('/:slug/view', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { slug: String(req.params.slug) },
+      select: { id: true },
+    });
+    if (product) {
+      await prisma.productView.create({ data: { productId: product.id } });
+    }
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

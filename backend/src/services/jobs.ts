@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { logger, dbLog } from '../utils/logger';
 import { verifyTransaction } from './mpesa';
 import { releaseStock } from './inventory';
+import { retryFailedNotifications, sendOrderExpired } from './notifications';
 
 async function expireUnpaidOrders(): Promise<void> {
   try {
@@ -30,6 +31,15 @@ async function expireUnpaidOrders(): Promise<void> {
 
         await dbLog('info', 'ORDER', `Order ${order.orderNumber} expired and cancelled`, {
           orderId: order.id,
+        });
+
+        // Notify customer that their order expired (non-blocking)
+        sendOrderExpired({
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          customerPhone: order.customerPhone,
+          customerName: order.customerName,
+          total: order.total,
         });
       } catch (err) {
         logger.error(`Failed to expire order ${order.id}`, err);
@@ -65,8 +75,22 @@ async function recheckPendingPayments(): Promise<void> {
         if (newStatus !== payment.status) {
           await prisma.payment.update({ where: { id: payment.id }, data: { status: newStatus } });
           if (newStatus === 'completed') {
-            await prisma.order.update({ where: { id: payment.orderId }, data: { status: 'paid' } });
+            const paidOrder = await prisma.order.update({
+              where: { id: payment.orderId },
+              data: { status: 'paid' },
+              select: { id: true, orderNumber: true, customerPhone: true, customerName: true, total: true },
+            });
             logger.info(`Payment ${payment.id} confirmed via background job`);
+
+            // Notify customer (non-blocking) — reconciliation path
+            const { sendPaymentConfirmation } = await import('./notifications');
+            sendPaymentConfirmation({
+              orderId: paidOrder.id,
+              orderNumber: paidOrder.orderNumber,
+              customerPhone: paidOrder.customerPhone,
+              customerName: paidOrder.customerName,
+              total: paidOrder.total,
+            });
           } else {
             await dbLog('warn', 'PAYMENT', 'Pending payment resolved as failed via background job', {
               paymentId: payment.id,
@@ -83,6 +107,14 @@ async function recheckPendingPayments(): Promise<void> {
   }
 }
 
+async function retryNotifications(): Promise<void> {
+  try {
+    await retryFailedNotifications();
+  } catch (err) {
+    logger.error('Error in retryNotifications job', err);
+  }
+}
+
 export function startBackgroundJobs(): void {
   // Expire unpaid orders every 5 minutes
   setInterval(expireUnpaidOrders, 5 * 60 * 1000);
@@ -90,5 +122,9 @@ export function startBackgroundJobs(): void {
   // Re-check pending payments every 10 minutes
   setInterval(recheckPendingPayments, 10 * 60 * 1000);
 
+  // Retry failed WhatsApp / SMS notifications every 5 minutes
+  setInterval(retryNotifications, 5 * 60 * 1000);
+
   logger.info('Background jobs started');
 }
+

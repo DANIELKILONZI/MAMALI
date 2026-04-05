@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { api, Advertisement, Product } from '@/lib/api';
 import { ProductGrid } from '@/components/products/ProductGrid';
+import { RotatingBanner } from '@/components/ui/RotatingBanner';
 
 export const revalidate = 60;
 
@@ -21,51 +22,14 @@ async function getData() {
 
 export default async function HomePage() {
   const { featured, categories, ads } = await getData();
-  const heroBanner = ads.find((a) => a.type === 'BANNER');
+  const heroBanners = ads.filter((a) => a.type === 'BANNER');
   const promoAds = ads.filter((a) => a.type === 'PROMOTION');
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       {/* Hero */}
       <section className="mb-12 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg">
-        {heroBanner?.imageUrl ? (
-          <div className="relative h-64 w-full sm:h-80 md:h-96">
-            <Image
-              src={heroBanner.imageUrl}
-              alt={heroBanner.title}
-              fill
-              className="object-cover opacity-50"
-              priority
-            />
-            <div className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
-              <h1 className="text-3xl font-extrabold sm:text-5xl">{heroBanner.title}</h1>
-              {heroBanner.content && (
-                <p className="mt-3 max-w-xl text-lg text-blue-100">{heroBanner.content}</p>
-              )}
-              {heroBanner.linkUrl && (
-                <Link
-                  href={heroBanner.linkUrl}
-                  className="mt-6 rounded-lg bg-white px-6 py-3 text-sm font-semibold text-blue-700 shadow transition hover:bg-blue-50"
-                >
-                  Shop Now
-                </Link>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center px-8 py-20 text-center">
-            <h1 className="text-4xl font-extrabold sm:text-6xl">Welcome to MAMALI</h1>
-            <p className="mt-4 max-w-xl text-lg text-blue-100">
-              Your trusted digital commerce platform in Kenya.
-            </p>
-            <Link
-              href="/products"
-              className="mt-6 rounded-lg bg-white px-8 py-3 text-sm font-semibold text-blue-700 shadow transition hover:bg-blue-50"
-            >
-              Shop Now
-            </Link>
-          </div>
-        )}
+        <RotatingBanner banners={heroBanners} />
       </section>
 
       {/* Promo Banners */}

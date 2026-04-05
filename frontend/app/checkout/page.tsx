@@ -15,6 +15,9 @@ type Step = 'form' | 'pending_payment' | 'done';
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLLS = 10;
 
+const LS_PHONE_KEY = 'mamali_last_phone';
+const LS_NAME_KEY = 'mamali_last_name';
+
 /** Validates Kenyan phone numbers (07XXXXXXXX or 2547XXXXXXXX) */
 function validateKenyanPhone(phone: string): string | null {
   const cleaned = phone.replace(/\s+/g, '');
@@ -26,17 +29,6 @@ function validateKenyanPhone(phone: string): string | null {
 
 /**
  * CheckoutPage — multi-step checkout with M-Pesa STK push payment.
- *
- * State transitions:
- *   'form'            — customer fills name + phone, submits order
- *   'pending_payment' — order created, STK push sent, polling payment status
- *   'done'            — payment confirmed (paid) or max polls reached (fallback)
- *
- * Payment polling:
- *   Polls GET /api/payments/:orderId/status every POLL_INTERVAL_MS (3 s),
- *   up to MAX_POLLS (10) times (30 s total). If payment is not confirmed by
- *   then, the user is shown a manual "check your phone" message and directed
- *   to their order status page.
  */
 export default function CheckoutPage() {
   const router = useRouter();
@@ -45,6 +37,10 @@ export default function CheckoutPage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [couponStatus, setCouponStatus] = useState<'idle' | 'applying' | 'applied' | 'error'>('idle');
+  const [couponMessage, setCouponMessage] = useState('');
+  const [discountAmount, setDiscountAmount] = useState(0);
   const [step, setStep] = useState<Step>('form');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -53,6 +49,16 @@ export default function CheckoutPage() {
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'completed' | 'failed'>('pending');
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Autofill from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedPhone = localStorage.getItem(LS_PHONE_KEY);
+      const savedName = localStorage.getItem(LS_NAME_KEY);
+      if (savedPhone) setPhone(savedPhone);
+      if (savedName) setName(savedName);
+    }
+  }, []);
+
   const stopPolling = useCallback(() => {
     if (pollRef.current) clearTimeout(pollRef.current);
   }, []);
@@ -60,7 +66,6 @@ export default function CheckoutPage() {
   const pollPaymentStatus = useCallback(
     async (orderId: string, count: number) => {
       if (count >= MAX_POLLS) {
-        // Max polls reached - show "check your phone" message
         stopPolling();
         return;
       }
@@ -100,6 +105,29 @@ export default function CheckoutPage() {
     );
   }
 
+  async function handleApplyCoupon() {
+    if (!couponCode.trim()) return;
+    setCouponStatus('applying');
+    setCouponMessage('');
+    try {
+      const res = await api.coupons.apply(couponCode.trim(), subtotal);
+      setDiscountAmount(res.discountAmount);
+      setCouponStatus('applied');
+      setCouponMessage(`✓ Coupon applied! You save KSh ${res.discountAmount.toLocaleString('en-KE')}`);
+    } catch (e) {
+      setCouponStatus('error');
+      setCouponMessage(e instanceof Error ? e.message : 'Invalid coupon code');
+      setDiscountAmount(0);
+    }
+  }
+
+  function handleRemoveCoupon() {
+    setCouponCode('');
+    setCouponStatus('idle');
+    setCouponMessage('');
+    setDiscountAmount(0);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -111,17 +139,22 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Save to localStorage for next time
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LS_PHONE_KEY, phone);
+      if (name) localStorage.setItem(LS_NAME_KEY, name);
+    }
+
     setLoading(true);
     try {
-      // 1. Create order
       const orderRes = await api.orders.create({
         customerName: name || undefined,
         customerPhone: formatted,
+        couponCode: couponStatus === 'applied' ? couponCode.trim() : undefined,
         items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
       });
       setOrder(orderRes.order);
 
-      // 2. Initiate payment
       await api.payments.initiate({
         orderId: orderRes.order.id,
         phoneNumber: formatted,
@@ -139,6 +172,8 @@ export default function CheckoutPage() {
       setLoading(false);
     }
   }
+
+  const orderTotal = subtotal - discountAmount;
 
   if (step === 'done' && order) {
     return (
@@ -179,6 +214,9 @@ export default function CheckoutPage() {
           Enter your M-Pesa PIN to complete the payment of{' '}
           <strong>KSh {order.total.toLocaleString('en-KE')}</strong>.
         </p>
+        <p className="mb-2 text-sm text-gray-500">1. Open M-Pesa on your phone</p>
+        <p className="mb-2 text-sm text-gray-500">2. Enter your M-Pesa PIN when prompted</p>
+        <p className="mb-4 text-sm text-gray-500">3. Wait for confirmation SMS</p>
         {pollCount >= MAX_POLLS && (
           <Alert variant="warning" className="mt-4 text-left">
             We haven&apos;t received payment confirmation yet. If you completed the payment, your
@@ -232,6 +270,51 @@ export default function CheckoutPage() {
                 hint="Format: 07XXXXXXXX or 2547XXXXXXXX"
                 required
               />
+
+              {/* Coupon code */}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Coupon Code (optional)
+                </label>
+                {couponStatus === 'applied' ? (
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700">
+                      {couponCode.toUpperCase()}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoupon}
+                      className="text-sm text-red-500 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                      placeholder="SAVE10"
+                      className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCoupon}
+                      disabled={couponStatus === 'applying' || !couponCode.trim()}
+                      className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+                    >
+                      {couponStatus === 'applying' ? '...' : 'Apply'}
+                    </button>
+                  </div>
+                )}
+                {couponMessage && (
+                  <p className={`mt-1 text-xs ${couponStatus === 'applied' ? 'text-green-600' : 'text-red-500'}`}>
+                    {couponMessage}
+                  </p>
+                )}
+              </div>
+
               <Button
                 type="submit"
                 loading={loading}
@@ -260,9 +343,21 @@ export default function CheckoutPage() {
                 </li>
               ))}
             </ul>
-            <div className="border-t border-gray-100 pt-3 flex justify-between text-base font-bold text-gray-900">
+            {discountAmount > 0 && (
+              <>
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Subtotal</span>
+                  <span>KSh {subtotal.toLocaleString('en-KE')}</span>
+                </div>
+                <div className="flex justify-between text-sm text-green-600 font-medium">
+                  <span>Coupon discount</span>
+                  <span>- KSh {discountAmount.toLocaleString('en-KE')}</span>
+                </div>
+              </>
+            )}
+            <div className="border-t border-gray-100 pt-3 mt-3 flex justify-between text-base font-bold text-gray-900">
               <span>Total</span>
-              <span>KSh {subtotal.toLocaleString('en-KE')}</span>
+              <span>KSh {orderTotal.toLocaleString('en-KE')}</span>
             </div>
             <p className="mt-3 text-xs text-gray-400">
               Payments powered by M-Pesa. You will receive an STK push after placing your order.
@@ -273,3 +368,4 @@ export default function CheckoutPage() {
     </div>
   );
 }
+

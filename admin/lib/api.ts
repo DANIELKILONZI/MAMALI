@@ -24,51 +24,84 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export const adminApi = {
   auth: {
     login: (email: string, password: string) =>
-      request<{ token: string; user: AdminUser }>('/api/admin/auth/login', {
+      request<{ token: string; user: AdminUser }>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       }),
-    me: () => request<AdminUser>('/api/admin/auth/me'),
+    me: () =>
+      request<{ success: boolean; user: AdminUser }>('/api/auth/me').then((r) => r.user),
   },
   dashboard: {
     get: () => request<DashboardData>('/api/admin/dashboard'),
   },
   products: {
     list: (params?: Record<string, string>) =>
-      request<PaginatedResponse<Product>>(`/api/admin/products?${new URLSearchParams(params)}`),
-    get: (id: string) => request<Product>(`/api/admin/products/${id}`),
+      request<{ success: boolean; products: Product[]; pagination: { total: number; page: number; limit: number; pages: number } }>(
+        `/api/products?${new URLSearchParams(params)}`
+      ).then((r) => ({
+        data: r.products,
+        total: r.pagination.total,
+        page: r.pagination.page,
+        limit: r.pagination.limit,
+        totalPages: r.pagination.pages,
+      })),
+    get: (id: string) => request<{ success: boolean; product: Product }>(`/api/products/${id}`).then((r) => r.product),
     create: (data: Partial<Product>) =>
-      request<Product>('/api/admin/products', { method: 'POST', body: JSON.stringify(data) }),
+      request<{ success: boolean; product: Product }>('/api/products', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((r) => r.product),
     update: (id: string, data: Partial<Product>) =>
-      request<Product>(`/api/admin/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      request<{ success: boolean; product: Product }>(`/api/products/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }).then((r) => r.product),
     delete: (id: string) =>
-      request<void>(`/api/admin/products/${id}`, { method: 'DELETE' }),
+      request<{ success: boolean; message: string }>(`/api/products/${id}`, { method: 'DELETE' }),
   },
   categories: {
     list: (params?: Record<string, string>) =>
-      request<Category[]>(`/api/admin/categories?${new URLSearchParams(params)}`),
-    get: (id: string) => request<Category>(`/api/admin/categories/${id}`),
+      request<{ success: boolean; categories: Category[] }>(
+        `/api/categories?${new URLSearchParams(params)}`
+      ).then((r) => r.categories),
+    get: (id: string) =>
+      request<{ success: boolean; category: Category }>(`/api/categories/${id}`).then((r) => r.category),
     create: (data: Partial<Category>) =>
-      request<Category>('/api/admin/categories', { method: 'POST', body: JSON.stringify(data) }),
+      request<{ success: boolean; category: Category }>('/api/categories', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((r) => r.category),
     update: (id: string, data: Partial<Category>) =>
-      request<Category>(`/api/admin/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      request<{ success: boolean; category: Category }>(`/api/categories/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }).then((r) => r.category),
     delete: (id: string) =>
-      request<void>(`/api/admin/categories/${id}`, { method: 'DELETE' }),
+      request<{ success: boolean; message: string }>(`/api/categories/${id}`, { method: 'DELETE' }),
   },
   orders: {
     list: (params?: Record<string, string>) =>
-      request<PaginatedResponse<Order>>(`/api/admin/orders?${new URLSearchParams(params)}`),
-    get: (id: string) => request<Order>(`/api/admin/orders/${id}`),
+      request<{ success: boolean; orders: Order[]; pagination: { total: number; page: number; limit: number; pages: number } }>(
+        `/api/orders/list?${new URLSearchParams(params)}`
+      ).then((r) => ({
+        data: r.orders,
+        total: r.pagination?.total ?? r.orders.length,
+        page: r.pagination?.page ?? 1,
+        limit: r.pagination?.limit ?? 20,
+        totalPages: r.pagination?.pages ?? 1,
+      })),
+    get: (orderNumber: string) =>
+      request<{ success: boolean; order: Order }>(`/api/orders/${orderNumber}`).then((r) => r.order),
     updateStatus: (id: string, status: string) =>
-      request<Order>(`/api/admin/orders/${id}/status`, {
-        method: 'PATCH',
+      request<{ success: boolean; order: Order }>(`/api/orders/${id}/status`, {
+        method: 'PUT',
         body: JSON.stringify({ status }),
-      }),
+      }).then((r) => r.order),
     assign: (id: string, staffId: string) =>
-      request<Order>(`/api/admin/orders/${id}/assign`, {
-        method: 'PATCH',
+      request<{ success: boolean; order: Order }>(`/api/orders/${id}/assign`, {
+        method: 'PUT',
         body: JSON.stringify({ staffId }),
-      }),
+      }).then((r) => r.order),
   },
   staff: {
     list: () => request<StaffUser[]>('/api/admin/staff'),
@@ -119,6 +152,82 @@ export const adminApi = {
         body: JSON.stringify({ ids }),
       }),
   },
+
+  settings: {
+    get: () => request<{ success: boolean; settings: StoreSettings }>('/api/admin/settings'),
+    update: (data: Partial<StoreSettings>) =>
+      request<{ success: boolean; settings: StoreSettings }>('/api/admin/settings', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+  },
+
+  coupons: {
+    list: () => request<{ success: boolean; coupons: Coupon[] }>('/api/admin/coupons'),
+    get: (id: string) => request<{ success: boolean; coupon: Coupon }>(`/api/admin/coupons/${id}`),
+    create: (data: Partial<Coupon>) =>
+      request<{ success: boolean; coupon: Coupon }>('/api/admin/coupons', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Partial<Coupon>) =>
+      request<{ success: boolean; coupon: Coupon }>(`/api/admin/coupons/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/api/admin/coupons/${id}`, { method: 'DELETE' }),
+  },
+
+  analytics: {
+    revenue: () => request<RevenueAnalytics>('/api/admin/analytics/revenue'),
+    products: () => request<ProductAnalytics>('/api/admin/analytics/products'),
+    funnel: () => request<FunnelAnalytics>('/api/admin/analytics/funnel'),
+    coupons: () => request<CouponAnalytics>('/api/admin/analytics/coupons'),
+    fraud: (threshold?: number) =>
+      request<FraudAlerts>(`/api/admin/analytics/fraud${threshold ? `?threshold=${threshold}` : ''}`),
+    customers: () => request<CustomerAnalytics>('/api/admin/analytics/customers'),
+  },
+
+  inventory: {
+    intelligence: () => request<InventoryIntelligence>('/api/admin/inventory/intelligence'),
+  },
+
+  customers: {
+    list: (params?: { page?: number; limit?: number; segment?: string; search?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.page) q.set('page', String(params.page));
+      if (params?.limit) q.set('limit', String(params.limit));
+      if (params?.segment && params.segment !== 'all') q.set('segment', params.segment);
+      if (params?.search) q.set('search', params.search);
+      const qs = q.toString();
+      return request<CustomerListResponse>(`/api/admin/customers${qs ? `?${qs}` : ''}`);
+    },
+    get: (phone: string) =>
+      request<CustomerDetailResponse>(`/api/admin/customers/${encodeURIComponent(phone)}`),
+    block: (phone: string, reason?: string) =>
+      request<{ success: boolean }>(`/api/admin/customers/${encodeURIComponent(phone)}/block`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
+    unblock: (phone: string) =>
+      request<{ success: boolean }>(`/api/admin/customers/${encodeURIComponent(phone)}/block`, {
+        method: 'DELETE',
+      }),
+  },
+
+  notifications: {
+    list: (params?: { page?: number; status?: string; channel?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.page) q.set('page', String(params.page));
+      if (params?.status && params.status !== 'all') q.set('status', params.status);
+      if (params?.channel && params.channel !== 'all') q.set('channel', params.channel);
+      const qs = q.toString();
+      return request<NotificationListResponse>(`/api/admin/notifications${qs ? `?${qs}` : ''}`);
+    },
+    resend: (id: string) =>
+      request<{ success: boolean }>(`/api/admin/notifications/${id}/resend`, { method: 'POST' }),
+  },
 };
 
 // ---- Types ----
@@ -132,10 +241,24 @@ export interface AdminUser {
 
 export interface DashboardData {
   totalRevenue: number;
+  aov: number;
+  abandonedLast24h: number;
   ordersByStatus: Record<string, number>;
   topProducts: { id: string; name: string; sales: number }[];
   lowStockProducts: { id: string; name: string; stock: number }[];
   recentOrders: Order[];
+  revenue?: {
+    total: number;
+    thisMonth: number;
+    lastMonth: number;
+    growth: number;
+  };
+  orders?: {
+    total: number;
+    pending: number;
+    processing: number;
+  };
+  lowStockAlerts?: { id: string; name: string; stock: number }[];
 }
 
 export interface Product {
@@ -240,10 +363,272 @@ export interface HomepageSection {
   isActive: boolean;
 }
 
+export interface StoreSettings {
+  id: string;
+  businessName: string;
+  currency: string;
+  logoUrl?: string | null;
+  primaryColor: string;
+  themeColor: string;
+  notificationsEnabled: boolean;
+  whatsappEnabled: boolean;
+  smsFallbackEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  description?: string;
+  discountType: 'percent' | 'fixed';
+  discountValue: number;
+  minOrderValue: number;
+  maxUses?: number | null;
+  usedCount: number;
+  isActive: boolean;
+  expiresAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;
   page: number;
   limit: number;
   totalPages: number;
+}
+
+export interface RevenueTrendDay {
+  date: string;
+  revenue: number;
+  orders: number;
+  discountGiven: number;
+}
+
+export interface RevenueAnalytics {
+  success: boolean;
+  trend: RevenueTrendDay[];
+  totalRevenue: number;
+  totalOrders: number;
+}
+
+export interface ProductStat {
+  productId: string;
+  name: string;
+  totalUnits: number;
+  totalRevenue: number;
+  totalOrders: number;
+  unitsLast30: number;
+  revenueLast30: number;
+  viewsLast30: number;
+  conversionRate: number | null;
+}
+
+export interface ProductAnalytics {
+  success: boolean;
+  products: ProductStat[];
+}
+
+export interface FunnelData {
+  ordersCreated: number;
+  paymentInitiated: number;
+  paymentCompleted: number;
+  delivered: number;
+  cancelled: number;
+  abandonmentRate: number;
+  paymentSuccessRate: number;
+}
+
+export interface FunnelAnalytics {
+  success: boolean;
+  funnel: FunnelData;
+}
+
+export interface CouponStat {
+  id: string;
+  code: string;
+  description?: string;
+  discountType: string;
+  discountValue: number;
+  isActive: boolean;
+  usedCount: number;
+  maxUses?: number | null;
+  expiresAt?: string | null;
+  revenueGenerated: number;
+  totalDiscount: number;
+  ordersWithCoupon: number;
+}
+
+export interface CouponAnalytics {
+  success: boolean;
+  coupons: CouponStat[];
+}
+
+export interface FraudAlert {
+  id: string;
+  orderNumber: string;
+  customerPhone: string;
+  customerName?: string;
+  status: string;
+  total: number;
+  riskScore: number;
+  riskFlags: string;
+  createdAt: string;
+}
+
+export interface FraudAlerts {
+  success: boolean;
+  alerts: FraudAlert[];
+}
+
+export interface ReorderAlert {
+  id: string;
+  name: string;
+  slug: string;
+  stock: number;
+  reorderLevel: number;
+}
+
+export interface FastMover {
+  productId: string;
+  name: string;
+  unitsSoldLast7Days: number;
+  currentStock: number;
+  reorderLevel: number;
+}
+
+export interface DeadStockItem {
+  id: string;
+  name: string;
+  slug: string;
+  stock: number;
+  price: number;
+  updatedAt: string;
+}
+
+export interface InventoryIntelligence {
+  success: boolean;
+  summary: { totalProducts: number; outOfStock: number; lowStock: number };
+  reorderAlerts: ReorderAlert[];
+  fastMovers: FastMover[];
+  deadStock: DeadStockItem[];
+  deadStockValue: number;
+}
+
+export interface CustomerStat {
+  phone: string;
+  name: string | null;
+  totalOrders: number;
+  totalSpent: number;
+  totalDiscount: number;
+  avgOrderValue: number;
+  lastOrderAt: string | null;
+  isRepeat: boolean;
+}
+
+export interface CustomerAnalyticsSummary {
+  totalUniqueCustomers: number;
+  repeatCustomers: number;
+  repeatRate: number;
+  avgCustomerLifetimeValue: number;
+  newCustomersLast30: number;
+  repeatCustomersLast30: number;
+  repeatRateLast30: number;
+}
+
+export interface CustomerAnalytics {
+  success: boolean;
+  summary: CustomerAnalyticsSummary;
+  topCustomers: CustomerStat[];
+}
+
+// ---- Customer Management ----
+
+export type CustomerSegment = 'vip' | 'returning' | 'inactive' | 'risky' | 'new' | 'all';
+
+export interface CustomerRecord {
+  phone: string;
+  name: string | null;
+  totalOrders: number;
+  totalSpent: number;
+  totalDiscount: number;
+  avgOrderValue: number;
+  lastOrderAt: string | null;
+  maxRiskScore: number;
+  segment: CustomerSegment;
+  isBlocked: boolean;
+}
+
+export interface CustomerListResponse {
+  success: boolean;
+  customers: CustomerRecord[];
+  pagination: { total: number; page: number; limit: number; pages: number };
+}
+
+export interface CustomerOrderItem {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+  total: number;
+}
+
+export interface CustomerOrder {
+  id: string;
+  orderNumber: string;
+  status: string;
+  total: number;
+  subtotal: number;
+  discountAmount: number;
+  couponCode: string | null;
+  createdAt: string;
+  riskScore: number;
+  items: CustomerOrderItem[];
+  payment: { status: string; mpesaReceiptNumber: string | null } | null;
+}
+
+export interface CustomerDetail {
+  phone: string;
+  name: string | null;
+  totalOrders: number;
+  totalSpent: number;
+  avgOrderValue: number;
+  lastOrderAt: string | null;
+  maxRiskScore: number;
+  segment: CustomerSegment;
+  isBlocked: boolean;
+  blockedReason: string | null;
+}
+
+export interface CustomerDetailResponse {
+  success: boolean;
+  customer: CustomerDetail;
+  orders: CustomerOrder[];
+}
+
+// ---- Notifications ----
+
+export interface NotificationLogEntry {
+  id: string;
+  orderId: string | null;
+  order: { orderNumber: string; customerName: string | null } | null;
+  channel: 'whatsapp' | 'sms';
+  recipient: string;
+  messageType: string;
+  body: string | null;
+  status: 'pending' | 'sent' | 'failed' | 'delivered';
+  error: string | null;
+  externalId: string | null;
+  retryCount: number;
+  sentAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationListResponse {
+  success: boolean;
+  logs: NotificationLogEntry[];
+  summary: { totalSent: number; totalFailed: number; totalPending: number };
+  pagination: { total: number; page: number; limit: number; pages: number };
 }

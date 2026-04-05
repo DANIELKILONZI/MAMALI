@@ -19,5 +19,18 @@ export const env = {
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
   LOG_TO_FILE: process.env.LOG_TO_FILE === 'true',
   ENABLE_DB_LOGS: process.env.ENABLE_DB_LOGS !== 'false',
+
+  // ── Notifications ────────────────────────────────────────────────────────
+  /** Set to 'true' to enable WhatsApp + SMS notifications */
+  NOTIFICATIONS_ENABLED: process.env.NOTIFICATIONS_ENABLED === 'true',
+
+  // WhatsApp (Meta Cloud API)
+  WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN || '',
+  WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+
+  // SMS fallback (Africa's Talking)
+  AT_API_KEY: process.env.AT_API_KEY || '',
+  AT_USERNAME: process.env.AT_USERNAME || '',
+  AT_SENDER_ID: process.env.AT_SENDER_ID || '',
 };
 

@@ -37,23 +37,25 @@ model Category {
 }
 
 model Product {
-  id              String       @id @default(cuid())
+  id              String        @id @default(cuid())
   name            String
-  slug            String       @unique
+  slug            String        @unique
   description     String?
   price           Float
-  discount        Float        @default(0)
-  stock           Int          @default(0)
-  images          String       @default("[]")
+  discount        Float         @default(0)
+  stock           Int           @default(0)
+  reorderLevel    Int           @default(5)
+  images          String        @default("[]")
   categoryId      String?
-  category        Category?    @relation(fields: [categoryId], references: [id])
-  isActive        Boolean      @default(true)
-  isFeatured      Boolean      @default(false)
+  category        Category?     @relation(fields: [categoryId], references: [id])
+  isActive        Boolean       @default(true)
+  isFeatured      Boolean       @default(false)
   discountEndsAt  DateTime?
-  boostScore      Int          @default(0)
+  boostScore      Int           @default(0)
   orderItems      OrderItem[]
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  views           ProductView[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@index([categoryId])
   @@index([isActive, isFeatured])
@@ -67,18 +69,27 @@ model Order {
   status          String      @default("pending")
   items           OrderItem[]
   subtotal        Float
+  discountAmount  Float       @default(0)
+  couponCode      String?
   total           Float
   assignedToId    String?
   assignedTo      User?       @relation("AssignedOrders", fields: [assignedToId], references: [id])
   payment         Payment?
   notes           String?
   expiresAt       DateTime?
+  riskScore       Int         @default(0)
+  riskFlags       String      @default("[]")
+  ipAddress       String?
+  userAgent       String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   activityLogs    ActivityLog[]
+  notifications   NotificationLog[]
 
   @@index([status])
   @@index([createdAt])
+  @@index([riskScore])
+  @@index([customerPhone])
 }
 
 model OrderItem {
@@ -195,4 +206,94 @@ model SystemLog {
 
   @@index([level, createdAt])
   @@index([category, createdAt])
+}
+
+model StoreSettings {
+  id                    String   @id @default(cuid())
+  businessName          String   @default("MAMALI")
+  currency              String   @default("KES")
+  logoUrl               String?
+  primaryColor          String   @default("#2563eb")
+  themeColor            String   @default("#1e293b")
+  notificationsEnabled  Boolean  @default(false)
+  whatsappEnabled       Boolean  @default(false)
+  smsFallbackEnabled    Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model Coupon {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  description   String?
+  discountType  String    @default("percent")
+  discountValue Float
+  minOrderValue Float     @default(0)
+  maxUses       Int?
+  usedCount     Int       @default(0)
+  isActive      Boolean   @default(true)
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([code])
+}
+
+model ProductView {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([productId, createdAt])
+}
+
+// Tracks abandoned checkout sessions for BI analytics
+model CheckoutSession {
+  id            String    @id @default(cuid())
+  sessionToken  String    @unique
+  customerPhone String?
+  cartItems     String    @default("[]")
+  cartValue     Float     @default(0)
+  isConverted   Boolean   @default(false)
+  orderId       String?
+  abandonedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([customerPhone])
+  @@index([isConverted, createdAt])
+}
+
+// Tracks WhatsApp and SMS notifications sent to customers
+model NotificationLog {
+  id          String    @id @default(cuid())
+  orderId     String?
+  order       Order?    @relation(fields: [orderId], references: [id])
+  channel     String    // 'whatsapp' | 'sms'
+  recipient   String
+  messageType String    // 'order_confirmed' | 'payment_confirmed' | 'order_shipped' | 'order_cancelled'
+  body        String?
+  status      String    @default("pending") // 'pending' | 'sent' | 'failed' | 'delivered'
+  error       String?
+  externalId  String?
+  retryCount  Int       @default(0)
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([status, createdAt])
+  @@index([recipient])
+}
+
+// Blocked customers — checked on order creation
+model BlockedCustomer {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  reason    String?
+  blockedBy String?
+  createdAt DateTime @default(now())
+
+  @@index([phone])
 }

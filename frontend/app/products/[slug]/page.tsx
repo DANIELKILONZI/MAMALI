@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { Alert } from '@/components/ui/Alert';
+import { CountdownTimer } from '@/components/ui/CountdownTimer';
 
 const stockBadge = {
   in_stock: { variant: 'green' as const, label: 'In Stock' },
@@ -45,6 +46,13 @@ export default function ProductDetailPage() {
   useEffect(() => {
     fetchProduct();
   }, [fetchProduct]);
+
+  // Fire-and-forget view tracking once product loads
+  useEffect(() => {
+    if (slug) {
+      api.products.recordView(slug).catch(() => {});
+    }
+  }, [slug]);
 
   if (loading) {
     return (
@@ -152,12 +160,29 @@ export default function ProductDetailPage() {
           )}
           <h1 className="mb-3 text-3xl font-extrabold text-gray-900">{product.name}</h1>
 
-          <div className="mb-4 flex items-center gap-3">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
             <Badge variant={badge.variant}>{badge.label}</Badge>
             {product.discount > 0 && (
               <Badge variant="red">-{product.discount}% OFF</Badge>
             )}
+            {product.boostScore && product.boostScore > 0 ? (
+              <Badge variant="blue">🔥 Hot Deal</Badge>
+            ) : null}
           </div>
+
+          {/* Scarcity indicator */}
+          {status === 'low_stock' && product.stock > 0 && (
+            <p className="mb-3 text-sm font-semibold text-red-600">
+              ⚠ Only {product.stock} left in stock — order soon!
+            </p>
+          )}
+
+          {/* Discount countdown */}
+          {product.discount > 0 && product.discountEndsAt && new Date(product.discountEndsAt) > new Date() && (
+            <div className="mb-4">
+              <CountdownTimer endsAt={product.discountEndsAt} label="Discount ends in" />
+            </div>
+          )}
 
           {/* Price */}
           <div className="mb-6 flex items-baseline gap-3">
@@ -221,7 +246,7 @@ export default function ProductDetailPage() {
             <Button
               onClick={() => {
                 handleAddToCart();
-                router.push('/cart');
+                router.push('/checkout');
               }}
               disabled={status === 'out_of_stock'}
               variant="secondary"

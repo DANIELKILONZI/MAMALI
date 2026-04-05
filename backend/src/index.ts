@@ -21,6 +21,8 @@ import cartRouter from './routes/cart';
 import advertisementsRouter from './routes/advertisements';
 import contentRouter from './routes/content';
 import adminRouter from './routes/admin';
+import settingsRouter from './routes/settings';
+import couponsRouter from './routes/coupons';
 
 const app = express();
 
@@ -51,6 +53,8 @@ app.use('/api/cart', cartRouter);
 app.use('/api/advertisements', advertisementsRouter);
 app.use('/api/content', contentRouter);
 app.use('/api/homepage', contentRouter);
+app.use('/api/settings', settingsRouter);
+app.use('/api/coupons', couponsRouter);
 app.use('/api/admin', adminRouter);
 
 app.use(errorHandler);

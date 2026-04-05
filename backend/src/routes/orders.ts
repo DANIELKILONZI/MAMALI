@@ -2,7 +2,10 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
+import { checkoutRateLimiter } from '../middleware/rateLimiter';
 import { logger } from '../utils/logger';
+import { assessOrderRisk } from '../services/fraud';
+import { sendOrderConfirmation, sendOrderCancellation } from '../services/notifications';
 
 const router = Router();
 
@@ -17,6 +20,7 @@ const createOrderSchema = z.object({
   customerPhone: z.string().min(9),
   customerName: z.string().optional(),
   notes: z.string().optional(),
+  couponCode: z.string().optional(),
   items: z.array(
     z.object({
       productId: z.string(),
@@ -40,9 +44,18 @@ const STAFF_ALLOWED_TRANSITIONS: Record<string, string[]> = {
   processing: ['delivered'],
 };
 
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', checkoutRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = createOrderSchema.parse(req.body);
+    const ipAddress = (req.ip ?? req.socket?.remoteAddress ?? '').replace('::ffff:', '');
+    const userAgent = req.headers['user-agent'] ?? '';
+
+    // Reject orders from blocked customers
+    const blocked = await prisma.blockedCustomer.findUnique({ where: { phone: data.customerPhone } });
+    if (blocked) {
+      res.status(403).json({ success: false, message: 'This phone number is not allowed to place orders.' });
+      return;
+    }
 
     const order = await prisma.$transaction(async (tx) => {
       const products = await tx.product.findMany({
@@ -83,7 +96,35 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       });
 
       const subtotal = orderItems.reduce((s, i) => s + i.total, 0);
-      const total = subtotal;
+
+      // Apply coupon if provided
+      let discountAmount = 0;
+      let resolvedCouponCode: string | undefined;
+      if (data.couponCode) {
+        const coupon = await tx.coupon.findUnique({ where: { code: data.couponCode.toUpperCase() } });
+        if (coupon && coupon.isActive && (!coupon.expiresAt || coupon.expiresAt >= new Date()) &&
+            subtotal >= coupon.minOrderValue) {
+          // Atomically increment usedCount only if still under the limit.
+          // Using updateMany with usedCount < maxUses in the WHERE clause ensures
+          // the check-and-increment is a single atomic database operation.
+          const usedCountWhere = coupon.maxUses !== null
+            ? { usedCount: { lt: coupon.maxUses } }
+            : {};
+          const updated = await tx.coupon.updateMany({
+            where: { id: coupon.id, isActive: true, ...usedCountWhere },
+            data: { usedCount: { increment: 1 } },
+          });
+          if (updated.count > 0) {
+            discountAmount = coupon.discountType === 'percent'
+              ? Math.min(subtotal, (subtotal * coupon.discountValue) / 100)
+              : Math.min(subtotal, coupon.discountValue);
+            discountAmount = Math.round(discountAmount * 100) / 100;
+            resolvedCouponCode = coupon.code;
+          }
+        }
+      }
+
+      const total = subtotal - discountAmount;
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
       const created = await tx.order.create({
@@ -93,18 +134,65 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
           customerName: data.customerName,
           notes: data.notes,
           subtotal,
+          discountAmount,
+          couponCode: resolvedCouponCode,
           total,
           expiresAt,
+          ipAddress: ipAddress || null,
+          userAgent: userAgent || null,
           items: { create: orderItems },
         },
         include: { items: { include: { product: { select: { id: true, name: true, slug: true } } } } },
       });
 
       await tx.activityLog.create({
-        data: { orderId: created.id, action: 'ORDER_CREATED', details: JSON.stringify({ total, itemCount: orderItems.length }) },
+        data: {
+          orderId: created.id,
+          action: 'ORDER_CREATED',
+          details: JSON.stringify({ total, itemCount: orderItems.length }),
+          ipAddress: ipAddress || null,
+        },
       });
 
       return created;
+    });
+
+    // Assess fraud risk after order is committed (non-blocking)
+    // Resolve the earliest product view time for rapid-checkout detection
+    const firstView = await prisma.productView.findFirst({
+      where: { productId: { in: data.items.map((i) => i.productId) } },
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true },
+    });
+
+    assessOrderRisk({
+      customerPhone: data.customerPhone,
+      orderTotal: order.total,
+      couponCode: data.couponCode,
+      ipAddress: ipAddress || undefined,
+      userAgent: userAgent || undefined,
+      firstViewedAt: firstView?.createdAt,
+    }).then(async ({ riskScore, flags }) => {
+      if (riskScore > 0) {
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { riskScore, riskFlags: JSON.stringify(flags) },
+        });
+        if (riskScore >= 30) {
+          logger.warn('High-risk order detected', { orderNumber: order.orderNumber, riskScore, flags });
+        }
+      }
+    }).catch((err) => {
+      logger.error('Fraud assessment failed', err);
+    });
+
+    // Fire order-confirmation notification (non-blocking)
+    sendOrderConfirmation({
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      customerPhone: order.customerPhone,
+      customerName: order.customerName,
+      total: order.total,
     });
 
     res.status(201).json({ success: true, order });
@@ -219,6 +307,18 @@ router.put('/:id/status', authenticate, authorize('ADMIN', 'STAFF'), async (req:
     });
 
     logger.info(`Order ${order.orderNumber} status changed`, { from: order.status, to: status });
+
+    // Fire customer notification for cancellations (non-blocking)
+    if (status === 'cancelled') {
+      sendOrderCancellation({
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        customerPhone: order.customerPhone,
+        customerName: order.customerName,
+        total: order.total,
+      });
+    }
+
     res.json({ success: true, order: updated });
   } catch (err) {
     next(err);

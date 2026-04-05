@@ -17,6 +17,11 @@ const stockBadge = {
   out_of_stock: { variant: 'red' as const, label: 'Out of Stock' },
 };
 
+function scarcityLabel(stock: number, status: string): string | null {
+  if (status === 'low_stock' && stock > 0) return `Only ${stock} left`;
+  return null;
+}
+
 export function ProductCard({ product }: ProductCardProps) {
   const { addItem } = useCart();
   const status = stockStatus(product.stock);
@@ -53,8 +58,11 @@ export function ProductCard({ product }: ProductCardProps) {
             </svg>
           </div>
         )}
-        <div className="absolute left-2 top-2">
+        <div className="absolute left-2 top-2 flex flex-col gap-1">
           <Badge variant={badge.variant}>{badge.label}</Badge>
+          {product.boostScore && product.boostScore > 0 ? (
+            <Badge variant="blue">🔥 Hot</Badge>
+          ) : null}
         </div>
         {product.discount > 0 && (
           <div className="absolute right-2 top-2">
@@ -88,6 +96,12 @@ export function ProductCard({ product }: ProductCardProps) {
             </span>
           )}
         </div>
+
+        {scarcityLabel(product.stock, status) && (
+          <p className="mb-2 text-xs font-semibold text-red-600">
+            ⚠ {scarcityLabel(product.stock, status)}
+          </p>
+        )}
 
         <Button
           onClick={handleAddToCart}

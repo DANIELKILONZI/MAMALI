@@ -121,9 +121,9 @@ export const adminApi = {
   },
 
   settings: {
-    get: () => request<{ success: boolean; settings: StoreSettings }>('/api/admin/settings/admin'),
+    get: () => request<{ success: boolean; settings: StoreSettings }>('/api/admin/settings'),
     update: (data: Partial<StoreSettings>) =>
-      request<{ success: boolean; settings: StoreSettings }>('/api/admin/settings/admin', {
+      request<{ success: boolean; settings: StoreSettings }>('/api/admin/settings', {
         method: 'PUT',
         body: JSON.stringify(data),
       }),

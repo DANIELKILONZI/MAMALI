@@ -11,7 +11,7 @@ async function getOrCreateSettings() {
   return prisma.storeSettings.create({ data: {} });
 }
 
-// Public: GET /api/settings
+// Public: GET /api/settings — also served at GET /api/admin/settings
 router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const settings = await getOrCreateSettings();
@@ -29,18 +29,8 @@ const settingsSchema = z.object({
   themeColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 });
 
-// Admin: GET /api/admin/settings
-router.get('/admin', authenticate, authorize('ADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const settings = await getOrCreateSettings();
-    res.json({ success: true, settings });
-  } catch (err) {
-    next(err);
-  }
-});
-
 // Admin: PUT /api/admin/settings
-router.put('/admin', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = settingsSchema.parse(req.body);
     const existing = await getOrCreateSettings();

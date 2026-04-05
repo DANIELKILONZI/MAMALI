@@ -189,6 +189,11 @@ test.describe('Checkout — full M-Pesa payment flow (mocked)', () => {
   });
 
   test('API order creation with valid coupon applies discount', async ({ request, testData }) => {
+    const productPrice = 1500; // matches seeded product price in global-setup
+    const discountPercent = 10; // E2ETEST10 is a 10% coupon
+    const expectedDiscount = productPrice * (discountPercent / 100);
+    const expectedTotal = productPrice - expectedDiscount;
+
     const res = await request.post(`${BACKEND_URL}/api/orders`, {
       data: {
         customerPhone: '254700999002',
@@ -202,8 +207,7 @@ test.describe('Checkout — full M-Pesa payment flow (mocked)', () => {
     expect(body.success).toBe(true);
     expect(body.order.discountAmount).toBeGreaterThan(0);
     expect(body.order.couponCode).toBe(testData.validCouponCode);
-    // 10% of 1500 = 150 discount → total = 1350
-    expect(body.order.total).toBe(1350);
+    expect(body.order.total).toBe(expectedTotal);
   });
 
   test('phone number is remembered across sessions (localStorage)', async ({ page, testData }) => {

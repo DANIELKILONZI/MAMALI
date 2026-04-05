@@ -127,14 +127,14 @@ async function globalSetup() {
   const expiredCouponCode = 'E2EEXPIRED';
   await prisma.coupon.upsert({
     where: { code: expiredCouponCode },
-    update: { isActive: true, expiresAt: new Date('2020-01-01') },
+    update: { isActive: true, expiresAt: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) },
     create: {
       code: expiredCouponCode,
       description: 'E2E expired coupon',
       discountType: 'percent',
       discountValue: 20,
       isActive: true,
-      expiresAt: new Date('2020-01-01'),
+      expiresAt: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000),
     },
   });
 

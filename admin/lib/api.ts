@@ -24,51 +24,84 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export const adminApi = {
   auth: {
     login: (email: string, password: string) =>
-      request<{ token: string; user: AdminUser }>('/api/admin/auth/login', {
+      request<{ token: string; user: AdminUser }>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       }),
-    me: () => request<AdminUser>('/api/admin/auth/me'),
+    me: () =>
+      request<{ success: boolean; user: AdminUser }>('/api/auth/me').then((r) => r.user),
   },
   dashboard: {
     get: () => request<DashboardData>('/api/admin/dashboard'),
   },
   products: {
     list: (params?: Record<string, string>) =>
-      request<PaginatedResponse<Product>>(`/api/admin/products?${new URLSearchParams(params)}`),
-    get: (id: string) => request<Product>(`/api/admin/products/${id}`),
+      request<{ success: boolean; products: Product[]; pagination: { total: number; page: number; limit: number; pages: number } }>(
+        `/api/products?${new URLSearchParams(params)}`
+      ).then((r) => ({
+        data: r.products,
+        total: r.pagination.total,
+        page: r.pagination.page,
+        limit: r.pagination.limit,
+        totalPages: r.pagination.pages,
+      })),
+    get: (id: string) => request<{ success: boolean; product: Product }>(`/api/products/${id}`).then((r) => r.product),
     create: (data: Partial<Product>) =>
-      request<Product>('/api/admin/products', { method: 'POST', body: JSON.stringify(data) }),
+      request<{ success: boolean; product: Product }>('/api/products', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((r) => r.product),
     update: (id: string, data: Partial<Product>) =>
-      request<Product>(`/api/admin/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      request<{ success: boolean; product: Product }>(`/api/products/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }).then((r) => r.product),
     delete: (id: string) =>
-      request<void>(`/api/admin/products/${id}`, { method: 'DELETE' }),
+      request<{ success: boolean; message: string }>(`/api/products/${id}`, { method: 'DELETE' }),
   },
   categories: {
     list: (params?: Record<string, string>) =>
-      request<Category[]>(`/api/admin/categories?${new URLSearchParams(params)}`),
-    get: (id: string) => request<Category>(`/api/admin/categories/${id}`),
+      request<{ success: boolean; categories: Category[] }>(
+        `/api/categories?${new URLSearchParams(params)}`
+      ).then((r) => r.categories),
+    get: (id: string) =>
+      request<{ success: boolean; category: Category }>(`/api/categories/${id}`).then((r) => r.category),
     create: (data: Partial<Category>) =>
-      request<Category>('/api/admin/categories', { method: 'POST', body: JSON.stringify(data) }),
+      request<{ success: boolean; category: Category }>('/api/categories', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((r) => r.category),
     update: (id: string, data: Partial<Category>) =>
-      request<Category>(`/api/admin/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      request<{ success: boolean; category: Category }>(`/api/categories/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }).then((r) => r.category),
     delete: (id: string) =>
-      request<void>(`/api/admin/categories/${id}`, { method: 'DELETE' }),
+      request<{ success: boolean; message: string }>(`/api/categories/${id}`, { method: 'DELETE' }),
   },
   orders: {
     list: (params?: Record<string, string>) =>
-      request<PaginatedResponse<Order>>(`/api/admin/orders?${new URLSearchParams(params)}`),
-    get: (id: string) => request<Order>(`/api/admin/orders/${id}`),
+      request<{ success: boolean; orders: Order[]; pagination: { total: number; page: number; limit: number; pages: number } }>(
+        `/api/orders/list?${new URLSearchParams(params)}`
+      ).then((r) => ({
+        data: r.orders,
+        total: r.pagination?.total ?? r.orders.length,
+        page: r.pagination?.page ?? 1,
+        limit: r.pagination?.limit ?? 20,
+        totalPages: r.pagination?.pages ?? 1,
+      })),
+    get: (orderNumber: string) =>
+      request<{ success: boolean; order: Order }>(`/api/orders/${orderNumber}`).then((r) => r.order),
     updateStatus: (id: string, status: string) =>
-      request<Order>(`/api/admin/orders/${id}/status`, {
-        method: 'PATCH',
+      request<{ success: boolean; order: Order }>(`/api/orders/${id}/status`, {
+        method: 'PUT',
         body: JSON.stringify({ status }),
-      }),
+      }).then((r) => r.order),
     assign: (id: string, staffId: string) =>
-      request<Order>(`/api/admin/orders/${id}/assign`, {
-        method: 'PATCH',
+      request<{ success: boolean; order: Order }>(`/api/orders/${id}/assign`, {
+        method: 'PUT',
         body: JSON.stringify({ staffId }),
-      }),
+      }).then((r) => r.order),
   },
   staff: {
     list: () => request<StaffUser[]>('/api/admin/staff'),

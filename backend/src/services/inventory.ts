@@ -1,7 +1,9 @@
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
+type TransactionClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
+
 
 interface StockItem {
   productId: string;
@@ -24,7 +26,7 @@ export async function checkAvailability(items: StockItem[]): Promise<{ available
 }
 
 export async function reserveStock(items: StockItem[]): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: TransactionClient) => {
     for (const item of items) {
       const product = await tx.product.findUnique({ where: { id: item.productId } });
       if (!product || product.stock < item.quantity) {
@@ -40,7 +42,7 @@ export async function reserveStock(items: StockItem[]): Promise<void> {
 }
 
 export async function releaseStock(items: StockItem[]): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: TransactionClient) => {
     for (const item of items) {
       await tx.product.update({
         where: { id: item.productId },

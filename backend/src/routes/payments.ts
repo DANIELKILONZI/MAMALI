@@ -1,12 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { initiateSTKPush, verifyTransaction } from '../services/mpesa';
 import { generateIdempotencyKey, isRequestProcessed, markRequestProcessed } from '../utils/idempotency';
 import { logger } from '../utils/logger';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const initiateSchema = z.object({
   orderId: z.string(),

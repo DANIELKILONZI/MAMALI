@@ -1,10 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Public: get homepage sections
 router.get('/homepage/sections', async (_req: Request, res: Response, next: NextFunction) => {

@@ -1,9 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const validateCartSchema = z.object({
   items: z.array(

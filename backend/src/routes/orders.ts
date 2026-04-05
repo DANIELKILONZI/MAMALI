@@ -1,12 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { checkAvailability, reserveStock } from '../services/inventory';
 import { logger } from '../utils/logger';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 function generateOrderNumber(): string {
   const date = new Date();

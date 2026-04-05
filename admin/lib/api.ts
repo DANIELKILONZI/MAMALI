@@ -145,6 +145,19 @@ export const adminApi = {
     delete: (id: string) =>
       request<{ success: boolean }>(`/api/admin/coupons/${id}`, { method: 'DELETE' }),
   },
+
+  analytics: {
+    revenue: () => request<RevenueAnalytics>('/api/admin/analytics/revenue'),
+    products: () => request<ProductAnalytics>('/api/admin/analytics/products'),
+    funnel: () => request<FunnelAnalytics>('/api/admin/analytics/funnel'),
+    coupons: () => request<CouponAnalytics>('/api/admin/analytics/coupons'),
+    fraud: (threshold?: number) =>
+      request<FraudAlerts>(`/api/admin/analytics/fraud${threshold ? `?threshold=${threshold}` : ''}`),
+  },
+
+  inventory: {
+    intelligence: () => request<InventoryIntelligence>('/api/admin/inventory/intelligence'),
+  },
 };
 
 // ---- Types ----
@@ -298,4 +311,121 @@ export interface PaginatedResponse<T> {
   page: number;
   limit: number;
   totalPages: number;
+}
+
+export interface RevenueTrendDay {
+  date: string;
+  revenue: number;
+  orders: number;
+  discountGiven: number;
+}
+
+export interface RevenueAnalytics {
+  success: boolean;
+  trend: RevenueTrendDay[];
+  totalRevenue: number;
+  totalOrders: number;
+}
+
+export interface ProductStat {
+  productId: string;
+  name: string;
+  totalUnits: number;
+  totalRevenue: number;
+  totalOrders: number;
+  unitsLast30: number;
+  revenueLast30: number;
+  viewsLast30: number;
+  conversionRate: number | null;
+}
+
+export interface ProductAnalytics {
+  success: boolean;
+  products: ProductStat[];
+}
+
+export interface FunnelData {
+  ordersCreated: number;
+  paymentInitiated: number;
+  paymentCompleted: number;
+  delivered: number;
+  cancelled: number;
+  abandonmentRate: number;
+  paymentSuccessRate: number;
+}
+
+export interface FunnelAnalytics {
+  success: boolean;
+  funnel: FunnelData;
+}
+
+export interface CouponStat {
+  id: string;
+  code: string;
+  description?: string;
+  discountType: string;
+  discountValue: number;
+  isActive: boolean;
+  usedCount: number;
+  maxUses?: number | null;
+  expiresAt?: string | null;
+  revenueGenerated: number;
+  totalDiscount: number;
+  ordersWithCoupon: number;
+}
+
+export interface CouponAnalytics {
+  success: boolean;
+  coupons: CouponStat[];
+}
+
+export interface FraudAlert {
+  id: string;
+  orderNumber: string;
+  customerPhone: string;
+  customerName?: string;
+  status: string;
+  total: number;
+  riskScore: number;
+  riskFlags: string;
+  createdAt: string;
+}
+
+export interface FraudAlerts {
+  success: boolean;
+  alerts: FraudAlert[];
+}
+
+export interface ReorderAlert {
+  id: string;
+  name: string;
+  slug: string;
+  stock: number;
+  reorderLevel: number;
+}
+
+export interface FastMover {
+  productId: string;
+  name: string;
+  unitsSoldLast7Days: number;
+  currentStock: number;
+  reorderLevel: number;
+}
+
+export interface DeadStockItem {
+  id: string;
+  name: string;
+  slug: string;
+  stock: number;
+  price: number;
+  updatedAt: string;
+}
+
+export interface InventoryIntelligence {
+  success: boolean;
+  summary: { totalProducts: number; outOfStock: number; lowStock: number };
+  reorderAlerts: ReorderAlert[];
+  fastMovers: FastMover[];
+  deadStock: DeadStockItem[];
+  deadStockValue: number;
 }

@@ -6,6 +6,8 @@ import staffRouter from './staff';
 import metricsRouter from './metrics';
 import settingsRouter from './settings';
 import couponsRouter from './coupons';
+import analyticsRouter from './analytics';
+import inventoryRouter from './inventory';
 
 const router = Router();
 
@@ -17,6 +19,8 @@ router.use('/homepage', adminHomepageRouter);
 router.use('/metrics', metricsRouter);
 router.use('/settings', settingsRouter);
 router.use('/coupons', couponsRouter);
+router.use('/analytics', analyticsRouter);
+router.use('/inventory', inventoryRouter);
 
 export default router;
 

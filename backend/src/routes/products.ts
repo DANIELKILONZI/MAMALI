@@ -13,6 +13,7 @@ const productSchema = z.object({
   discount: z.number().min(0).max(100).default(0),
   discountEndsAt: z.string().datetime().nullable().optional(),
   stock: z.number().int().min(0).default(0),
+  reorderLevel: z.number().int().min(0).default(5),
   images: z.array(z.string()).default([]),
   categoryId: z.string().optional().nullable(),
   isActive: z.boolean().default(true),
@@ -130,6 +131,22 @@ router.delete('/:id', authenticate, authorize('ADMIN'), async (req: Request, res
   try {
     await prisma.product.update({ where: { id: String(req.params.id) }, data: { isActive: false } });
     res.json({ success: true, message: 'Product deactivated' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Public: record a product view (fire-and-forget by clients)
+router.post('/:slug/view', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { slug: String(req.params.slug) },
+      select: { id: true },
+    });
+    if (product) {
+      await prisma.productView.create({ data: { productId: product.id } });
+    }
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

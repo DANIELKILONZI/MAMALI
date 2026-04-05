@@ -47,6 +47,13 @@ export default function ProductDetailPage() {
     fetchProduct();
   }, [fetchProduct]);
 
+  // Fire-and-forget view tracking once product loads
+  useEffect(() => {
+    if (slug) {
+      api.products.recordView(slug).catch(() => {});
+    }
+  }, [slug]);
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">

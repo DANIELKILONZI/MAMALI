@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { adminApi, DashboardData } from '@/lib/api';
+import Link from 'next/link';
+import { adminApi, DashboardData, FraudAlerts } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import AdminLayout from '@/components/layout/AdminLayout';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -11,18 +12,24 @@ import toast from 'react-hot-toast';
 function DashboardPage() {
   const { user } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
+  const [fraud, setFraud] = useState<FraudAlerts | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    adminApi.dashboard
-      .get()
-      .then(setData)
+    Promise.all([
+      adminApi.dashboard.get(),
+      adminApi.analytics.fraud(60),
+    ])
+      .then(([dash, fr]) => {
+        setData(dash);
+        setFraud(fr);
+      })
       .catch(() => toast.error('Failed to load dashboard'))
       .finally(() => setIsLoading(false));
   }, []);
 
   const formatCurrency = (v: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
+    new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(v);
 
   return (
     <AdminLayout>
@@ -35,6 +42,27 @@ function DashboardPage() {
         <div className="text-center py-12 text-gray-500">Loading...</div>
       ) : data ? (
         <div className="space-y-6">
+          {/* High-Risk Fraud Alert Banner */}
+          {fraud && fraud.alerts.length > 0 && (
+            <div className="rounded-lg border border-red-300 bg-red-50 px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🚨</span>
+                <div>
+                  <p className="font-semibold text-red-800">
+                    {fraud.alerts.length} High-Risk Order{fraud.alerts.length !== 1 ? 's' : ''} Detected
+                  </p>
+                  <p className="text-sm text-red-600">Review these orders for potential fraud</p>
+                </div>
+              </div>
+              <Link
+                href="/analytics"
+                className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800"
+              >
+                Review →
+              </Link>
+            </div>
+          )}
+
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
@@ -99,7 +127,10 @@ function DashboardPage() {
           {/* Low Stock Alerts */}
           {(data.lowStockProducts ?? []).length > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-amber-800 mb-3">⚠️ Low Stock Alerts</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-amber-800">⚠️ Low Stock Alerts</h3>
+                <Link href="/inventory" className="text-sm text-amber-700 hover:underline">View Inventory →</Link>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {data.lowStockProducts.map((p) => (
                   <div key={p.id} className="bg-white rounded p-3 text-sm">

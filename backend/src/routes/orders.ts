@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { logger } from '../utils/logger';
+import { assessOrderRisk } from '../services/fraud';
 
 const router = Router();
 
@@ -136,6 +137,25 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       });
 
       return created;
+    });
+
+    // Assess fraud risk after order is committed (non-blocking)
+    assessOrderRisk({
+      customerPhone: data.customerPhone,
+      orderTotal: order.total,
+      couponCode: data.couponCode,
+    }).then(async ({ riskScore, flags }) => {
+      if (riskScore > 0) {
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { riskScore, riskFlags: JSON.stringify(flags) },
+        });
+        if (riskScore >= 30) {
+          logger.warn('High-risk order detected', { orderNumber: order.orderNumber, riskScore, flags });
+        }
+      }
+    }).catch((err) => {
+      logger.error('Fraud assessment failed', err);
     });
 
     res.status(201).json({ success: true, order });

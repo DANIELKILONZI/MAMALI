@@ -37,23 +37,25 @@ model Category {
 }
 
 model Product {
-  id              String       @id @default(cuid())
+  id              String        @id @default(cuid())
   name            String
-  slug            String       @unique
+  slug            String        @unique
   description     String?
   price           Float
-  discount        Float        @default(0)
-  stock           Int          @default(0)
-  images          String       @default("[]")
+  discount        Float         @default(0)
+  stock           Int           @default(0)
+  reorderLevel    Int           @default(5)
+  images          String        @default("[]")
   categoryId      String?
-  category        Category?    @relation(fields: [categoryId], references: [id])
-  isActive        Boolean      @default(true)
-  isFeatured      Boolean      @default(false)
+  category        Category?     @relation(fields: [categoryId], references: [id])
+  isActive        Boolean       @default(true)
+  isFeatured      Boolean       @default(false)
   discountEndsAt  DateTime?
-  boostScore      Int          @default(0)
+  boostScore      Int           @default(0)
   orderItems      OrderItem[]
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  views           ProductView[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@index([categoryId])
   @@index([isActive, isFeatured])
@@ -75,12 +77,15 @@ model Order {
   payment         Payment?
   notes           String?
   expiresAt       DateTime?
+  riskScore       Int         @default(0)
+  riskFlags       String      @default("[]")
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   activityLogs    ActivityLog[]
 
   @@index([status])
   @@index([createdAt])
+  @@index([riskScore])
 }
 
 model OrderItem {
@@ -225,4 +230,13 @@ model Coupon {
   updatedAt     DateTime  @updatedAt
 
   @@index([code])
+}
+
+model ProductView {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([productId, createdAt])
 }

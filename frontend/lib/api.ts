@@ -222,6 +222,9 @@ export const api = {
     get: (slug: string) =>
       apiFetch<{ success: boolean; product: Product }>(`/api/products/${slug}`),
 
+    recordView: (slug: string) =>
+      fetch(`${API_URL}/api/products/${slug}/view`, { method: 'POST' }).catch(() => {}),
+
     search: (query: string, page = 1) =>
       apiFetch<ProductsResponse>(`/api/products${buildQuery({ search: query, page })}`),
   },

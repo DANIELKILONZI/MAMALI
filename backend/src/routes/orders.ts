@@ -17,6 +17,7 @@ const createOrderSchema = z.object({
   customerPhone: z.string().min(9),
   customerName: z.string().optional(),
   notes: z.string().optional(),
+  couponCode: z.string().optional(),
   items: z.array(
     z.object({
       productId: z.string(),
@@ -83,7 +84,25 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       });
 
       const subtotal = orderItems.reduce((s, i) => s + i.total, 0);
-      const total = subtotal;
+
+      // Apply coupon if provided
+      let discountAmount = 0;
+      let resolvedCouponCode: string | undefined;
+      if (data.couponCode) {
+        const coupon = await tx.coupon.findUnique({ where: { code: data.couponCode.toUpperCase() } });
+        if (coupon && coupon.isActive && (!coupon.expiresAt || coupon.expiresAt >= new Date()) &&
+            (coupon.maxUses === null || coupon.usedCount < coupon.maxUses) &&
+            subtotal >= coupon.minOrderValue) {
+          discountAmount = coupon.discountType === 'percent'
+            ? Math.min(subtotal, (subtotal * coupon.discountValue) / 100)
+            : Math.min(subtotal, coupon.discountValue);
+          discountAmount = Math.round(discountAmount * 100) / 100;
+          resolvedCouponCode = coupon.code;
+          await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });
+        }
+      }
+
+      const total = subtotal - discountAmount;
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
       const created = await tx.order.create({
@@ -93,6 +112,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
           customerName: data.customerName,
           notes: data.notes,
           subtotal,
+          discountAmount,
+          couponCode: resolvedCouponCode,
           total,
           expiresAt,
           items: { create: orderItems },

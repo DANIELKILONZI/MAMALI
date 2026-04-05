@@ -23,6 +23,8 @@ export interface Product {
   description?: string;
   price: number;
   discount: number;
+  discountEndsAt?: string | null;
+  boostScore?: number;
   stock: number;
   images: string[];
   categoryId?: string;
@@ -87,6 +89,8 @@ export interface Order {
   status: string;
   items: OrderItem[];
   subtotal: number;
+  discountAmount?: number;
+  couponCode?: string;
   total: number;
   notes?: string;
   payment?: Payment;
@@ -130,6 +134,23 @@ export interface HomepageSection {
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface StoreSettings {
+  id: string;
+  businessName: string;
+  currency: string;
+  logoUrl?: string | null;
+  primaryColor: string;
+  themeColor: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CouponApplyResult {
+  success: boolean;
+  coupon: { id: string; code: string; discountType: string; discountValue: number };
+  discountAmount: number;
 }
 
 export interface CartValidationItem {
@@ -220,6 +241,7 @@ export const api = {
       customerPhone: string;
       customerName?: string;
       notes?: string;
+      couponCode?: string;
       items: { productId: string; quantity: number }[];
     }) =>
       apiFetch<{ success: boolean; order: Order }>('/api/orders', {
@@ -265,6 +287,19 @@ export const api = {
   homepage: {
     getSections: () =>
       apiFetch<{ success: boolean; sections: HomepageSection[] }>('/api/homepage/sections'),
+  },
+
+  settings: {
+    get: () =>
+      apiFetch<{ success: boolean; settings: StoreSettings }>('/api/settings'),
+  },
+
+  coupons: {
+    apply: (code: string, orderTotal: number) =>
+      apiFetch<CouponApplyResult>('/api/coupons/apply', {
+        method: 'POST',
+        body: JSON.stringify({ code, orderTotal }),
+      }),
   },
 };
 

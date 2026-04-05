@@ -119,6 +119,32 @@ export const adminApi = {
         body: JSON.stringify({ ids }),
       }),
   },
+
+  settings: {
+    get: () => request<{ success: boolean; settings: StoreSettings }>('/api/admin/settings/admin'),
+    update: (data: Partial<StoreSettings>) =>
+      request<{ success: boolean; settings: StoreSettings }>('/api/admin/settings/admin', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+  },
+
+  coupons: {
+    list: () => request<{ success: boolean; coupons: Coupon[] }>('/api/admin/coupons'),
+    get: (id: string) => request<{ success: boolean; coupon: Coupon }>(`/api/admin/coupons/${id}`),
+    create: (data: Partial<Coupon>) =>
+      request<{ success: boolean; coupon: Coupon }>('/api/admin/coupons', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Partial<Coupon>) =>
+      request<{ success: boolean; coupon: Coupon }>(`/api/admin/coupons/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/api/admin/coupons/${id}`, { method: 'DELETE' }),
+  },
 };
 
 // ---- Types ----
@@ -238,6 +264,32 @@ export interface HomepageSection {
   content: string;
   sortOrder: number;
   isActive: boolean;
+}
+
+export interface StoreSettings {
+  id: string;
+  businessName: string;
+  currency: string;
+  logoUrl?: string | null;
+  primaryColor: string;
+  themeColor: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  description?: string;
+  discountType: 'percent' | 'fixed';
+  discountValue: number;
+  minOrderValue: number;
+  maxUses?: number | null;
+  usedCount: number;
+  isActive: boolean;
+  expiresAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PaginatedResponse<T> {

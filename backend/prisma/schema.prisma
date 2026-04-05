@@ -67,6 +67,8 @@ model Order {
   status          String      @default("pending")
   items           OrderItem[]
   subtotal        Float
+  discountAmount  Float       @default(0)
+  couponCode      String?
   total           Float
   assignedToId    String?
   assignedTo      User?       @relation("AssignedOrders", fields: [assignedToId], references: [id])
@@ -195,4 +197,32 @@ model SystemLog {
 
   @@index([level, createdAt])
   @@index([category, createdAt])
+}
+
+model StoreSettings {
+  id           String   @id @default(cuid())
+  businessName String   @default("MAMALI")
+  currency     String   @default("KES")
+  logoUrl      String?
+  primaryColor String   @default("#2563eb")
+  themeColor   String   @default("#1e293b")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Coupon {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  description   String?
+  discountType  String    @default("percent")
+  discountValue Float
+  minOrderValue Float     @default(0)
+  maxUses       Int?
+  usedCount     Int       @default(0)
+  isActive      Boolean   @default(true)
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([code])
 }

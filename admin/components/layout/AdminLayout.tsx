@@ -9,9 +9,11 @@ const navItems = [
   { href: '/products', label: 'Products', icon: '📦' },
   { href: '/categories', label: 'Categories', icon: '🗂️' },
   { href: '/orders', label: 'Orders', icon: '🛒' },
+  { href: '/coupons', label: 'Coupons', icon: '🎟️' },
   { href: '/advertisements', label: 'Advertisements', icon: '📢' },
   { href: '/content', label: 'Content', icon: '📄' },
   { href: '/homepage', label: 'Homepage', icon: '🏠' },
+  { href: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

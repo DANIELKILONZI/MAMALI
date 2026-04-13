@@ -228,6 +228,15 @@ export const adminApi = {
     resend: (id: string) =>
       request<{ success: boolean }>(`/api/admin/notifications/${id}/resend`, { method: 'POST' }),
   },
+
+  health: {
+    basic: () => request<{ success: boolean; message: string; timestamp: string }>('/api/health'),
+    fullCheck: () => request<SystemHealthResponse>('/api/health/full-check'),
+  },
+
+  alerts: {
+    get: () => request<AlertsResponse>('/api/admin/alerts'),
+  },
 };
 
 // ---- Types ----
@@ -631,4 +640,46 @@ export interface NotificationListResponse {
   logs: NotificationLogEntry[];
   summary: { totalSent: number; totalFailed: number; totalPending: number };
   pagination: { total: number; page: number; limit: number; pages: number };
+}
+
+// ---- System Health ----
+
+export interface HealthComponentStatus {
+  status: 'ok' | 'warn' | 'error';
+  latencyMs?: number;
+  detail?: string;
+  metrics?: Record<string, number>;
+}
+
+export interface SystemHealthResponse {
+  success: boolean;
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  startedAt: string;
+  components: {
+    database: HealthComponentStatus;
+    orders: HealthComponentStatus;
+    notifications: HealthComponentStatus;
+    fraud: HealthComponentStatus;
+  };
+  error?: string;
+}
+
+// ---- Alerts ----
+
+export type AlertSeverity = 'warning' | 'critical';
+
+export interface Alert {
+  type: string;
+  severity: AlertSeverity;
+  message: string;
+  value: number;
+  threshold: number;
+  unit: string;
+  generatedAt: string;
+}
+
+export interface AlertsResponse {
+  success: boolean;
+  alerts: Alert[];
+  summary: { total: number; critical: number; warning: number };
 }

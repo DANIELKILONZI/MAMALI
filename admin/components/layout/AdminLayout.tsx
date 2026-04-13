@@ -2,30 +2,57 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { adminApi } from '@/lib/api';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: '📊' },
-  { href: '/analytics', label: 'Analytics', icon: '📈' },
-  { href: '/products', label: 'Products', icon: '📦' },
-  { href: '/categories', label: 'Categories', icon: '🗂️' },
-  { href: '/orders', label: 'Orders', icon: '🛒' },
-  { href: '/customers', label: 'Customers', icon: '👥' },
-  { href: '/inventory', label: 'Inventory', icon: '🏭' },
-  { href: '/coupons', label: 'Coupons', icon: '🎟️' },
-  { href: '/advertisements', label: 'Advertisements', icon: '📢' },
-  { href: '/notifications', label: 'Notifications', icon: '🔔' },
-  { href: '/content', label: 'Content', icon: '📄' },
-  { href: '/homepage', label: 'Homepage', icon: '🏠' },
-  { href: '/settings', label: 'Settings', icon: '⚙️' },
+  { href: '/dashboard',      label: 'Dashboard',      icon: '📊' },
+  { href: '/alerts',         label: 'Alerts',          icon: '🚨' },
+  { href: '/analytics',      label: 'Analytics',       icon: '📈' },
+  { href: '/products',       label: 'Products',        icon: '📦' },
+  { href: '/categories',     label: 'Categories',      icon: '🗂️' },
+  { href: '/orders',         label: 'Orders',          icon: '🛒' },
+  { href: '/customers',      label: 'Customers',       icon: '👥' },
+  { href: '/inventory',      label: 'Inventory',       icon: '🏭' },
+  { href: '/coupons',        label: 'Coupons',         icon: '🎟️' },
+  { href: '/advertisements', label: 'Advertisements',  icon: '📢' },
+  { href: '/notifications',  label: 'Notifications',   icon: '🔔' },
+  { href: '/content',        label: 'Content',         icon: '📄' },
+  { href: '/homepage',       label: 'Homepage',        icon: '🏠' },
+  { href: '/settings',       label: 'Settings',        icon: '⚙️' },
 ];
+
+const ALERT_POLL_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, logout, isAdmin } = useAuth();
+  const [alertCount, setAlertCount] = useState<{ critical: number; total: number } | null>(null);
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + '/');
+
+  // Poll for active alert count every 2 minutes to show badge in nav
+  useEffect(() => {
+    let cancelled = false;
+    const fetchAlerts = async () => {
+      try {
+        const data = await adminApi.alerts.get();
+        if (!cancelled) {
+          setAlertCount({ critical: data.summary.critical, total: data.summary.total });
+        }
+      } catch {
+        // silently ignore — no badge shown if unavailable
+      }
+    };
+    fetchAlerts();
+    const interval = setInterval(fetchAlerts, ALERT_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -48,7 +75,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               }`}
             >
               <span>{item.icon}</span>
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {/* Alert badge on the Alerts nav item */}
+              {item.href === '/alerts' && alertCount && alertCount.total > 0 && (
+                <span
+                  className={`inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-bold leading-none ${
+                    alertCount.critical > 0
+                      ? 'bg-red-500 text-white'
+                      : 'bg-yellow-400 text-yellow-900'
+                  }`}
+                >
+                  {alertCount.total}
+                </span>
+              )}
             </Link>
           ))}
 

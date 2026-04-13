@@ -6,7 +6,7 @@
  */
 
 import { prisma } from '../lib/prisma';
-import { logger } from '../utils/logger';
+import { logger, dbLog } from '../utils/logger';
 import { isWhatsAppEnabled, sendWhatsAppText } from './whatsapp';
 import { isSMSEnabled, sendSMS } from './sms';
 
@@ -124,6 +124,12 @@ export async function sendNotification(opts: SendNotificationOptions): Promise<v
     status = 'failed';
     error = String(err);
     logger.error('Notification send failed', { recipient, messageType, error });
+    dbLog('error', 'NOTIFICATION', 'notification.failed', {
+      orderId: orderId ?? null,
+      recipient,
+      messageType,
+      error,
+    }).catch(() => {});
   }
 
   // Persist the log entry (non-blocking)

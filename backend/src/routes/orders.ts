@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { checkoutRateLimiter } from '../middleware/rateLimiter';
-import { logger } from '../utils/logger';
+import { logger, dbLog } from '../utils/logger';
 import { assessOrderRisk } from '../services/fraud';
 import { sendOrderConfirmation, sendOrderCancellation } from '../services/notifications';
 
@@ -180,11 +180,29 @@ router.post('/', checkoutRateLimiter, async (req: Request, res: Response, next: 
         });
         if (riskScore >= 30) {
           logger.warn('High-risk order detected', { orderNumber: order.orderNumber, riskScore, flags });
+          dbLog('warn', 'FRAUD', 'fraud.flagged', {
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            customerPhone: order.customerPhone,
+            riskScore,
+            flags,
+          }).catch(() => {});
         }
       }
     }).catch((err) => {
       logger.error('Fraud assessment failed', err);
     });
+
+    // Structured event log: order.created
+    dbLog('info', 'ORDER', 'order.created', {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      customerPhone: order.customerPhone,
+      total: order.total,
+      itemCount: order.items?.length ?? 0,
+      couponCode: order.couponCode ?? undefined,
+      ipAddress: ipAddress || undefined,
+    }).catch(() => {});
 
     // Fire order-confirmation notification (non-blocking)
     sendOrderConfirmation({

@@ -34,9 +34,10 @@ setInterval(() => {
   }
 }, 15 * 60 * 1000);
 
+const MAX_ORDERS_PER_HOUR = 5;
+const CHECKOUT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
 export function checkoutRateLimiter(req: Request, res: Response, next: NextFunction): void {
-  const MAX_ORDERS_PER_HOUR = 5;
-  const WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
   const phone: string | undefined = req.body?.customerPhone;
   if (!phone) {
@@ -49,7 +50,7 @@ export function checkoutRateLimiter(req: Request, res: Response, next: NextFunct
   const entry = phoneOrderCounts.get(key);
 
   if (!entry || entry.resetAt <= now) {
-    phoneOrderCounts.set(key, { count: 1, resetAt: now + WINDOW_MS });
+    phoneOrderCounts.set(key, { count: 1, resetAt: now + CHECKOUT_WINDOW_MS });
     next();
     return;
   }

@@ -103,11 +103,11 @@ export async function assessOrderRisk(params: {
     }
 
     // Single coupon used by 5+ different phones in last 24h → mass sharing
-    const uniquePhoneCount = await prisma.order.groupBy({
+    const uniquePhones = await prisma.order.groupBy({
       by: ['customerPhone'],
       where: { couponCode: couponCode.toUpperCase(), createdAt: { gte: oneDayAgo } },
     });
-    if (uniquePhoneCount.length >= 5) {
+    if (uniquePhones.length >= 5) {
       flags.push('COUPON_MASS_SHARING');
       riskScore += 20;
     }

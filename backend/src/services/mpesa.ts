@@ -1,35 +1,12 @@
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
+import { withRetry } from '../utils/retry';
 
 const BASE_URL =
   env.MPESA_ENVIRONMENT === 'production'
     ? 'https://api.safaricom.co.ke'
     : 'https://sandbox.safaricom.co.ke';
-
-async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
-  const delays = [1000, 2000, 4000];
-  let lastErr: unknown;
-  for (let attempt = 0; attempt <= delays.length; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      const axiosErr = err as AxiosError;
-      // Do not retry on 4xx responses
-      if (axiosErr.response && axiosErr.response.status >= 400 && axiosErr.response.status < 500) {
-        throw err;
-      }
-      lastErr = err;
-      if (attempt < delays.length) {
-        logger.warn(`${label}: attempt ${attempt + 1} failed, retrying in ${delays[attempt]}ms`, {
-          message: axiosErr.message,
-        });
-        await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
-      }
-    }
-  }
-  throw lastErr;
-}
 
 export async function getAccessToken(): Promise<string> {
   return withRetry(async () => {

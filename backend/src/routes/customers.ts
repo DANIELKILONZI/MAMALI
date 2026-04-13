@@ -11,10 +11,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
+import { PAID_ORDER_STATUSES } from '../lib/constants';
 
 const router = Router();
-
-const PAID_STATUSES = ['paid', 'processing', 'delivered'] as const;
 
 /** Derive a customer segment from their stats. */
 function deriveSegment(
@@ -45,13 +44,10 @@ router.get(
       const segment = (req.query.segment as string) ?? 'all';
       const search = ((req.query.search as string) ?? '').trim();
 
-      const PAID = [...PAID_STATUSES];
-
-      // Aggregate per phone
       const raw = await prisma.order.groupBy({
         by: ['customerPhone'],
         where: {
-          status: { in: PAID },
+          status: { in: [...PAID_ORDER_STATUSES] },
           ...(search
             ? {
                 OR: [
@@ -148,7 +144,7 @@ router.get(
         prisma.blockedCustomer.findUnique({ where: { phone } }),
       ]);
 
-      const paidOrders = orders.filter((o) => PAID_STATUSES.includes(o.status as typeof PAID_STATUSES[number]));
+      const paidOrders = orders.filter((o) => PAID_ORDER_STATUSES.includes(o.status as typeof PAID_ORDER_STATUSES[number]));
       const totalSpent = paidOrders.reduce((s, o) => s + o.total, 0);
       const totalOrders = paidOrders.length;
       const lastOrderAt = orders[0]?.createdAt ?? null;

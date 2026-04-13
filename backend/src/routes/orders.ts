@@ -77,12 +77,8 @@ router.post('/', checkoutRateLimiter, async (req: Request, res: Response, next: 
         throw Object.assign(new Error('Insufficient stock'), { statusCode: 400, outOfStock });
       }
 
-      // Reserve stock within transaction
+      // Reserve stock within transaction — products were already fetched and validated above
       for (const item of data.items) {
-        const product = await tx.product.findUnique({ where: { id: item.productId } });
-        if (!product || product.stock < item.quantity) {
-          throw Object.assign(new Error(`Insufficient stock for product ${item.productId}`), { statusCode: 400 });
-        }
         await tx.product.update({
           where: { id: item.productId },
           data: { stock: { decrement: item.quantity } },

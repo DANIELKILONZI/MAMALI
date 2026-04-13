@@ -75,7 +75,7 @@ router.get('/', authenticate, authorize('ADMIN'), async (_req: Request, res: Res
   }
 });
 
-const couponSchema = z.object({
+const couponSchemaBase = z.object({
   code: z.string().min(1).transform((s) => s.toUpperCase()),
   description: z.string().optional(),
   discountType: z.enum(['percent', 'fixed']).default('percent'),
@@ -84,6 +84,23 @@ const couponSchema = z.object({
   maxUses: z.number().int().positive().nullable().optional(),
   isActive: z.boolean().default(true),
   expiresAt: z.string().datetime().nullable().optional(),
+});
+
+function validatePercentDiscount(data: { discountType?: string; discountValue?: number }): boolean {
+  return !(data.discountType === 'percent' && data.discountValue !== undefined && data.discountValue > 100);
+}
+
+const couponSchema = couponSchemaBase.superRefine((data, ctx) => {
+  if (!validatePercentDiscount(data)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.too_big,
+      maximum: 100,
+      type: 'number',
+      inclusive: true,
+      path: ['discountValue'],
+      message: 'Percent discount cannot exceed 100',
+    });
+  }
 });
 
 // Admin: create coupon
@@ -110,7 +127,11 @@ router.post('/', authenticate, authorize('ADMIN'), async (req: Request, res: Res
 // Admin: update coupon
 router.put('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = couponSchema.partial().parse(req.body);
+    const data = couponSchemaBase.partial().parse(req.body);
+    if (!validatePercentDiscount(data)) {
+      res.status(400).json({ success: false, message: 'Percent discount cannot exceed 100' });
+      return;
+    }
     if (data.code) {
       const exists = await prisma.coupon.findFirst({
         where: { code: data.code, NOT: { id: String(req.params.id) } },

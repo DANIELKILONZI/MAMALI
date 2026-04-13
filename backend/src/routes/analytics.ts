@@ -219,7 +219,7 @@ router.get('/coupons', authenticate, authorize('ADMIN'), async (_req: Request, r
 // GET /api/admin/analytics/fraud — high-risk orders
 router.get('/fraud', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const threshold = parseInt((req.query.threshold as string) ?? '30', 10);
+    const threshold = Math.max(0, parseInt((req.query.threshold as string) ?? '30', 10) || 30);
     const alerts = await getFraudAlerts(threshold, 50);
     res.json({ success: true, alerts });
   } catch (err) {

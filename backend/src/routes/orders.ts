@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
@@ -10,9 +11,9 @@ import { sendOrderConfirmation, sendOrderCancellation } from '../services/notifi
 const router = Router();
 
 function generateOrderNumber(): string {
-  const date = new Date();
-  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
-  const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  // 3 random bytes → 6 hex chars → 16^6 = 16.7M combos per date prefix
+  const suffix = crypto.randomBytes(3).toString('hex').toUpperCase();
   return `ORD-${dateStr}-${suffix}`;
 }
 
@@ -222,9 +223,10 @@ router.post('/', checkoutRateLimiter, async (req: Request, res: Response, next: 
 
 router.get('/list', authenticate, authorize('ADMIN', 'STAFF'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { status, page = '1', limit = '20', search } = req.query;
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
-    const take = parseInt(limit as string);
+    const { status, page: pageParam = '1', limit: limitParam = '20', search } = req.query;
+    const page = Math.max(1, parseInt(pageParam as string, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(limitParam as string, 10) || 1));
+    const skip = (page - 1) * limit;
 
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
@@ -240,7 +242,7 @@ router.get('/list', authenticate, authorize('ADMIN', 'STAFF'), async (req: Reque
       prisma.order.findMany({
         where,
         skip,
-        take,
+        take: limit,
         include: {
           items: true,
           payment: true,
@@ -254,7 +256,7 @@ router.get('/list', authenticate, authorize('ADMIN', 'STAFF'), async (req: Reque
     res.json({
       success: true,
       orders,
-      pagination: { total, page: parseInt(page as string), limit: take, pages: Math.ceil(total / take) },
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
   } catch (err) {
     next(err);
@@ -301,14 +303,30 @@ router.put('/:id/status', authenticate, authorize('ADMIN', 'STAFF'), async (req:
       }
     }
 
-    // If cancelling, release stock
+    // If cancelling, atomically release stock and update status in a single transaction
+    // to prevent a race condition where two concurrent requests both read status='pending'
+    // and both release stock, resulting in a double stock-release.
+    let updated;
     if (status === 'cancelled' && ['pending', 'awaiting_payment'].includes(order.status)) {
-      const items = await prisma.orderItem.findMany({ where: { orderId: order.id } });
-      const { releaseStock } = await import('../services/inventory');
-      await releaseStock(items.map((i) => ({ productId: i.productId, quantity: i.quantity })));
+      updated = await prisma.$transaction(async (tx) => {
+        // Re-read status inside the transaction (ACID guarantee: no concurrent release possible)
+        const current = await tx.order.findUnique({ where: { id: order.id }, select: { status: true } });
+        if (!current || !['pending', 'awaiting_payment'].includes(current.status)) {
+          // Already cancelled or advanced concurrently — return current state
+          return tx.order.findUnique({ where: { id: order.id } });
+        }
+        const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
+        for (const item of items) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
+        return tx.order.update({ where: { id: order.id }, data: { status: 'cancelled' } });
+      });
+    } else {
+      updated = await prisma.order.update({ where: { id: String(req.params.id) }, data: { status } });
     }
-
-    const updated = await prisma.order.update({ where: { id: String(req.params.id) }, data: { status } });
 
     await prisma.activityLog.create({
       data: {

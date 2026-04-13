@@ -45,7 +45,7 @@ const refreshSchema = z.object({
   refreshToken: z.string().min(1),
 });
 
-function issueRefreshToken(userId: string): { raw: string; expiresAt: Date } {
+function issueRefreshToken(): { raw: string; expiresAt: Date } {
   const raw = crypto.randomBytes(48).toString('hex');
   const days = parseInt(env.REFRESH_TOKEN_EXPIRES_IN) || 30;
   const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
@@ -92,7 +92,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
     );
 
     // Issue refresh token
-    const { raw: refreshTokenRaw, expiresAt } = issueRefreshToken(user.id);
+    const { raw: refreshTokenRaw, expiresAt } = issueRefreshToken();
     await prisma.refreshToken.create({
       data: { userId: user.id, token: refreshTokenRaw, expiresAt },
     });
@@ -139,7 +139,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       env.JWT_SECRET,
       { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions
     );
-    const { raw: newRefreshRaw, expiresAt } = issueRefreshToken(user.id);
+    const { raw: newRefreshRaw, expiresAt } = issueRefreshToken();
     await prisma.refreshToken.create({ data: { userId: user.id, token: newRefreshRaw, expiresAt } });
 
     const useCookies = req.headers['x-use-cookies'] === 'true';

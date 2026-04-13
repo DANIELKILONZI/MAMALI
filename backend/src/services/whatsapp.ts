@@ -11,6 +11,7 @@
 import axios, { AxiosError } from 'axios';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
+import { withRetry } from '../utils/retry';
 
 const GRAPH_API_VERSION = 'v18.0';
 const BASE_URL = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
@@ -45,46 +46,29 @@ export async function sendWhatsAppText(
   to: string,
   body: string
 ): Promise<WhatsAppSendResult> {
-  const phoneId = env.WHATSAPP_PHONE_NUMBER_ID;
-  const url = `${BASE_URL}/${phoneId}/messages`;
+  return withRetry(async () => {
+    const phoneId = env.WHATSAPP_PHONE_NUMBER_ID;
+    const url = `${BASE_URL}/${phoneId}/messages`;
 
-  const payload = {
-    messaging_product: 'whatsapp',
-    recipient_type: 'individual',
-    to: toE164(to),
-    type: 'text',
-    text: { preview_url: false, body },
-  };
+    const payload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: toE164(to),
+      type: 'text',
+      text: { preview_url: false, body },
+    };
 
-  const delays = [1000, 3000];
-  let lastErr: unknown;
+    const response = await axios.post(url, payload, {
+      headers: {
+        Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 10_000,
+    });
 
-  for (let attempt = 0; attempt <= delays.length; attempt++) {
-    try {
-      const response = await axios.post(url, payload, {
-        headers: {
-          Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 10_000,
-      });
-
-      const msgId: string =
-        response.data?.messages?.[0]?.id ?? response.data?.message_id ?? 'unknown';
-      logger.info('WhatsApp message sent', { to, msgId });
-      return { messageId: msgId };
-    } catch (err) {
-      const axiosErr = err as AxiosError;
-      // Do not retry on 4xx (bad credentials, invalid number, etc.)
-      if (axiosErr.response && axiosErr.response.status >= 400 && axiosErr.response.status < 500) {
-        throw err;
-      }
-      lastErr = err;
-      if (attempt < delays.length) {
-        await new Promise((r) => setTimeout(r, delays[attempt]));
-      }
-    }
-  }
-
-  throw lastErr;
+    const msgId: string =
+      response.data?.messages?.[0]?.id ?? response.data?.message_id ?? 'unknown';
+    logger.info('WhatsApp message sent', { to, msgId });
+    return { messageId: msgId };
+  }, 'sendWhatsAppText', [1000, 3000]);
 }

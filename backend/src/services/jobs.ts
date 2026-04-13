@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma';
 import { logger, dbLog } from '../utils/logger';
 import { verifyTransaction } from './mpesa';
 import { releaseStock } from './inventory';
-import { retryFailedNotifications, sendOrderExpired } from './notifications';
+import { retryFailedNotifications, sendOrderExpired, sendPaymentConfirmation } from './notifications';
 
 async function expireUnpaidOrders(): Promise<void> {
   try {
@@ -83,7 +83,6 @@ async function recheckPendingPayments(): Promise<void> {
             logger.info(`Payment ${payment.id} confirmed via background job`);
 
             // Notify customer (non-blocking) — reconciliation path
-            const { sendPaymentConfirmation } = await import('./notifications');
             sendPaymentConfirmation({
               orderId: paidOrder.id,
               orderNumber: paidOrder.orderNumber,

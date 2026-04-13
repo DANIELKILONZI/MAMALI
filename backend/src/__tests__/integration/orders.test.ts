@@ -5,24 +5,16 @@
  * Seeds test data before all tests and cleans up after all tests.
  */
 
-import request from 'supertest';
 import app from '../../index';
 import { prisma } from '../../lib/prisma';
 import { seedIntegrationData, cleanIntegrationData, IntegrationFixtures } from '../helpers/setup';
 
+// All tests call the running server via fetch (localhost:5000).
+// The app import keeps the module graph intact for Jest environment setup.
+void app;
+
 const PREFIX = 'INT_ORD_';
 const TEST_PHONE = '254999901001';
-
-// ── We need supertest but it's not installed. We'll use fetch instead. ────────
-// Supertest needs to be installed. Let's use node-fetch directly against the
-// running process, OR import the app Express instance and test without port.
-
-// Check if supertest is available; fallback to direct prisma + service calls
-// For this project we'll use the fetch approach with the Express app's
-// request handler directly (supertest-style).
-
-// Actually, let's use supertest only if installed. The test file will
-// call the backend HTTP layer via the app export.
 
 const BASE = 'http://localhost:5000';
 

@@ -23,9 +23,22 @@ const productSchema = z.object({
 
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { category, search, minPrice, maxPrice, page = '1', limit = '20', featured } = req.query;
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
-    const take = parseInt(limit as string);
+    const { category, search, minPrice, maxPrice, page: pageParam = '1', limit: limitParam = '20', featured } = req.query;
+    const page = Math.max(1, parseInt(pageParam as string, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(limitParam as string, 10) || 1));
+    const skip = (page - 1) * limit;
+
+    // Validate numeric price filters — return 400 rather than silently sending NaN to Prisma
+    const minPriceVal = minPrice ? parseFloat(minPrice as string) : undefined;
+    const maxPriceVal = maxPrice ? parseFloat(maxPrice as string) : undefined;
+    if (minPriceVal !== undefined && isNaN(minPriceVal)) {
+      res.status(400).json({ success: false, message: 'minPrice must be a valid number' });
+      return;
+    }
+    if (maxPriceVal !== undefined && isNaN(maxPriceVal)) {
+      res.status(400).json({ success: false, message: 'maxPrice must be a valid number' });
+      return;
+    }
 
     const where: Record<string, unknown> = { isActive: true };
     if (category) {
@@ -33,10 +46,11 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       if (cat) where.categoryId = cat.id;
     }
     if (search) where.name = { contains: search as string };
-    if (minPrice || maxPrice) {
-      where.price = {};
-      if (minPrice) (where.price as Record<string, unknown>).gte = parseFloat(minPrice as string);
-      if (maxPrice) (where.price as Record<string, unknown>).lte = parseFloat(maxPrice as string);
+    if (minPriceVal !== undefined || maxPriceVal !== undefined) {
+      where.price = {
+        ...(minPriceVal !== undefined ? { gte: minPriceVal } : {}),
+        ...(maxPriceVal !== undefined ? { lte: maxPriceVal } : {}),
+      };
     }
     if (featured === 'true') where.isFeatured = true;
 
@@ -44,7 +58,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       prisma.product.findMany({
         where,
         skip,
-        take,
+        take: limit,
         include: { category: { select: { id: true, name: true, slug: true } } },
         orderBy: [{ boostScore: 'desc' }, { createdAt: 'desc' }],
       }),
@@ -54,7 +68,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     res.json({
       success: true,
       products: products.map((p) => ({ ...p, images: JSON.parse(p.images) })),
-      pagination: { total, page: parseInt(page as string), limit: take, pages: Math.ceil(total / take) },
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
   } catch (err) {
     next(err);

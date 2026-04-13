@@ -11,6 +11,8 @@ import inventoryRouter from './inventory';
 import customersRouter from './customers';
 import notificationsAdminRouter from './notificationsAdmin';
 
+import alertsRouter from './alerts';
+
 const router = Router();
 
 router.use('/dashboard', dashboardRouter);
@@ -25,6 +27,7 @@ router.use('/analytics', analyticsRouter);
 router.use('/inventory', inventoryRouter);
 router.use('/customers', customersRouter);
 router.use('/notifications', notificationsAdminRouter);
+router.use('/alerts', alertsRouter);
 
 export default router;
 

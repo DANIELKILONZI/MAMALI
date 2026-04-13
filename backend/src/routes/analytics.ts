@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, authorize } from '../middleware/auth';
 import { getFraudAlerts } from '../services/fraud';
+import { PAID_ORDER_STATUSES } from '../lib/constants';
 
 const router = Router();
 
@@ -218,7 +219,7 @@ router.get('/coupons', authenticate, authorize('ADMIN'), async (_req: Request, r
 // GET /api/admin/analytics/fraud — high-risk orders
 router.get('/fraud', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const threshold = parseInt((req.query.threshold as string) ?? '30', 10);
+    const threshold = Math.max(0, parseInt((req.query.threshold as string) ?? '30', 10) || 30);
     const alerts = await getFraudAlerts(threshold, 50);
     res.json({ success: true, alerts });
   } catch (err) {
@@ -230,7 +231,7 @@ router.get('/fraud', authenticate, authorize('ADMIN'), async (req: Request, res:
 router.get('/customers', authenticate, authorize('ADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const PAID_STATUSES = ['paid', 'processing', 'delivered'] as const;
+    const PAID_STATUSES = PAID_ORDER_STATUSES;
 
     // Aggregate all-time orders per customer phone
     const allTimeCustomers = await prisma.order.groupBy({

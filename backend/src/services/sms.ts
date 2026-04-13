@@ -9,9 +9,10 @@
  *   AT_SENDER_ID   — (optional) shortcode or alphanumeric sender ID
  */
 
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
+import { withRetry } from '../utils/retry';
 
 const AT_BASE_URL = 'https://api.africastalking.com/version1/messaging';
 
@@ -46,46 +47,30 @@ export async function sendSMS(
   to: string,
   message: string
 ): Promise<SMSSendResult> {
-  const params = new URLSearchParams({
-    username: env.AT_USERNAME,
-    to: toATPhone(to),
-    message,
-    ...(env.AT_SENDER_ID ? { from: env.AT_SENDER_ID } : {}),
-  });
+  return withRetry(async () => {
+    const params = new URLSearchParams({
+      username: env.AT_USERNAME,
+      to: toATPhone(to),
+      message,
+      ...(env.AT_SENDER_ID ? { from: env.AT_SENDER_ID } : {}),
+    });
 
-  const delays = [1000, 3000];
-  let lastErr: unknown;
+    const response = await axios.post(AT_BASE_URL, params.toString(), {
+      headers: {
+        apiKey: env.AT_API_KEY,
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      timeout: 10_000,
+    });
 
-  for (let attempt = 0; attempt <= delays.length; attempt++) {
-    try {
-      const response = await axios.post(AT_BASE_URL, params.toString(), {
-        headers: {
-          apiKey: env.AT_API_KEY,
-          Accept: 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        timeout: 10_000,
-      });
+    const recipients: Array<{ messageId?: string; statusCode?: string }> =
+      response.data?.SMSMessageData?.Recipients ?? [];
+    const first = recipients[0] ?? {};
+    const msgId = first.messageId ?? 'unknown';
+    const status = first.statusCode ?? 'unknown';
 
-      const recipients: Array<{ messageId?: string; statusCode?: string }> =
-        response.data?.SMSMessageData?.Recipients ?? [];
-      const first = recipients[0] ?? {};
-      const msgId = first.messageId ?? 'unknown';
-      const status = first.statusCode ?? 'unknown';
-
-      logger.info('SMS sent via Africa\'s Talking', { to, msgId, status });
-      return { messageId: msgId, status };
-    } catch (err) {
-      const axiosErr = err as AxiosError;
-      if (axiosErr.response && axiosErr.response.status >= 400 && axiosErr.response.status < 500) {
-        throw err;
-      }
-      lastErr = err;
-      if (attempt < delays.length) {
-        await new Promise((r) => setTimeout(r, delays[attempt]));
-      }
-    }
-  }
-
-  throw lastErr;
+    logger.info('SMS sent via Africa\'s Talking', { to, msgId, status });
+    return { messageId: msgId, status };
+  }, 'sendSMS', [1000, 3000]);
 }

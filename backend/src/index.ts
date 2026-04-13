@@ -12,6 +12,7 @@ import { logger } from './utils/logger';
 import { startBackgroundJobs } from './services/jobs';
 import { prisma } from './lib/prisma';
 
+import healthRouter from './routes/health';
 import authRouter from './routes/auth';
 import productsRouter from './routes/products';
 import categoriesRouter from './routes/categories';
@@ -41,6 +42,7 @@ app.use(csrfProtect);
 app.get('/api/health', (_req, res) => {
   res.json({ success: true, message: 'MAMALI API is running', timestamp: new Date().toISOString() });
 });
+app.use('/api/health', healthRouter);
 
 app.get('/api/csrf-token', csrfTokenHandler);
 

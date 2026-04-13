@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma';
-
+import { PAID_ORDER_STATUSES } from '../lib/constants';
 
 export async function getDashboardStats() {
   const now = new Date();
@@ -8,7 +8,7 @@ export async function getDashboardStats() {
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const PAID = ['paid', 'processing', 'delivered'] as const;
+  const PAID = PAID_ORDER_STATUSES;
 
   const [
     totalRevenueAgg,

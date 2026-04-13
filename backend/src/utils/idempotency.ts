@@ -21,7 +21,3 @@ export function isRequestProcessed(key: string): boolean {
 export function markRequestProcessed(key: string, result: unknown, ttlMs = 300_000): void {
   processedRequests.set(key, { result, expiresAt: Date.now() + ttlMs });
 }
-
-export function getProcessedResult(key: string): unknown {
-  return processedRequests.get(key)?.result;
-}

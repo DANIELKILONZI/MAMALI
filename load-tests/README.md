@@ -77,6 +77,42 @@ k6 run load-tests/concurrent-checkout.k6.js
 
 ---
 
+### 4. Late Payment Callback (`late-payment-callback.k6.js`)
+Simulates M-Pesa callbacks arriving late while new orders are still being created simultaneously.
+Verifies that concurrent order creation + callback processing causes no deadlocks or 500 errors.
+
+```bash
+BASE_URL=http://localhost:5000 \
+PRODUCT_ID=xxx \
+ADMIN_TOKEN=xxx \
+k6 run load-tests/late-payment-callback.k6.js
+```
+
+**Expected outcome:**
+- Zero 5xx responses from the callback endpoint
+- Zero database deadlock errors
+- Orders with late successful callbacks are moved to `paid` state
+
+---
+
+### 5. Notification Retry Queue Flood (`notification-retry.k6.js`)
+Floods the notification retry endpoint with 100 concurrent resend requests per second while the
+admin dashboard simultaneously polls the notification list.
+
+```bash
+BASE_URL=http://localhost:5000 \
+ADMIN_TOKEN=xxx \
+NOTIFICATION_IDS=id1,id2,id3 \  # optional, falls back to synthetic IDs
+k6 run load-tests/notification-retry.k6.js
+```
+
+**Thresholds:**
+- Notification list p(95) < 1000 ms (dashboard stays responsive)
+- Retry endpoint p(95) < 3000 ms
+- Zero 5xx errors from either endpoint
+
+---
+
 ## Interpreting Results
 
 ```

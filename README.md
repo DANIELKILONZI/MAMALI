@@ -136,8 +136,27 @@ MPESA_CALLBACK_URL=
 
 ## Production Deployment
 
-1. Change `DATABASE_URL` to a PostgreSQL URL and update `prisma/schema.prisma` provider to `postgresql`
-2. Set strong `JWT_SECRET` in environment
-3. Set real M-Pesa Daraja production credentials
-4. Build all three apps: `npm run build`
-5. Serve backend with PM2 or Docker; frontend/admin with Vercel or similar
+Guided deployment: `./deploy/deploy.sh` (installs deps, validates env, builds, migrates, starts PM2).
+
+1. Set strong `JWT_SECRET` and `REFRESH_TOKEN_SECRET` in `backend/.env`
+2. Set real M-Pesa Daraja production credentials
+3. Run `./deploy/deploy.sh`
+4. Install the Nginx config and SSL (`deploy/nginx.conf`, `deploy/setup-https.sh`)
+
+### Backups
+
+`./deploy/backup.sh [dir]` backs up SQLite (safe `.backup`, gzipped) or PostgreSQL (`pg_dump`), with 14-day retention. Add to cron:
+
+```
+0 3 * * * /path/to/MAMALI/deploy/backup.sh /var/backups/mamali
+```
+
+### Scaling: migrate SQLite → PostgreSQL
+
+SQLite allows a single writer, so the backend runs as **one PM2 instance**. To scale past that:
+
+1. Provision PostgreSQL and set `DATABASE_URL=postgresql://user:pass@host:5432/mamali` in `backend/.env`
+2. Change `provider = "sqlite"` to `provider = "postgresql"` in `backend/prisma/schema.prisma`
+3. Regenerate migrations against PostgreSQL: `npx prisma migrate dev --name init_postgres` (fresh DB) — Prisma migrations are dialect-specific and cannot be reused across providers
+4. Export/import data if migrating a live store (e.g. `npx prisma db seed` for a fresh start, or a one-off script reading the SQLite file)
+5. Raise `instances` for `mamali-backend` in `deploy/ecosystem.config.js` (e.g. `'max'` with `exec_mode: 'cluster'`)

@@ -5,7 +5,7 @@
 //   pm2 save && pm2 startup
 // =============================================================================
 
-const path = require('path');
+const path = require('node:path');
 const ROOT  = path.resolve(__dirname, '..');
 
 module.exports = {
@@ -15,8 +15,11 @@ module.exports = {
       name: 'mamali-backend',
       cwd: path.join(ROOT, 'backend'),
       script: 'dist/index.js',
-      instances: 'max',      // one per CPU core
-      exec_mode: 'cluster',
+      // SQLite allows one writer at a time — multiple cluster workers cause
+      // write-lock failures under load. Raise instances only after migrating
+      // DATABASE_URL to PostgreSQL (see README "Production Deployment").
+      instances: 1,
+      exec_mode: 'fork',
       watch: false,
       max_memory_restart: '512M',
       env: {

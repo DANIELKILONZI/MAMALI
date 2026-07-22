@@ -17,6 +17,16 @@ export const authLimiter = rateLimit({
   message: { success: false, message: 'Too many login attempts, please try again later.' },
 });
 
+// Separate instance so customer register/login doesn't share (or drain)
+// the stricter admin login budget.
+export const customerAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many attempts, please try again later.' },
+});
+
 /**
  * Per-phone checkout rate limiter.
  *

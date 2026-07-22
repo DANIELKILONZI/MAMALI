@@ -89,8 +89,21 @@ export function Header({ businessName = 'MAMALI', logoUrl = null, categories = [
           ))}
         </nav>
 
-        {/* Cart + mobile toggle */}
-        <div className="ml-auto flex items-center gap-3 md:ml-0">
+        {/* Account + cart + mobile toggle */}
+        <div className="ml-auto flex items-center gap-1 md:ml-0">
+          <Link
+            href="/account"
+            aria-label="My account"
+            className="rounded-lg p-2 transition hover:bg-gray-100"
+          >
+            <svg className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              />
+            </svg>
+          </Link>
           <Link href="/cart" className="relative rounded-lg p-2 transition hover:bg-gray-100">
             <svg
               className="h-6 w-6 text-gray-700"

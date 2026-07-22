@@ -297,3 +297,16 @@ model BlockedCustomer {
 
   @@index([phone])
 }
+
+// Optional customer accounts — shopping never requires one; accounts only
+// add order history and checkout prefill for returning customers.
+model Customer {
+  id           String   @id @default(cuid())
+  phone        String   @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([phone])
+}

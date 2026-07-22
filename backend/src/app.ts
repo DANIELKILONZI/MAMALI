@@ -21,6 +21,7 @@ import contentRouter from './routes/content';
 import adminRouter from './routes/admin';
 import settingsRouter from './routes/settings';
 import couponsRouter from './routes/coupons';
+import customerAccountRouter from './routes/customerAccount';
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use('/api/content', contentRouter);
 app.use('/api/homepage', contentRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/coupons', couponsRouter);
+app.use('/api/customer', customerAccountRouter);
 app.use('/api/admin', adminRouter);
 
 app.use(errorHandler);

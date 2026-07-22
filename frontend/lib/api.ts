@@ -310,6 +310,68 @@ export const api = {
         body: JSON.stringify({ code, orderTotal }),
       }),
   },
+
+  // Optional customer accounts — shopping never requires one.
+  customer: {
+    register: (body: { phone: string; name?: string; password: string }) =>
+      apiFetch<{ success: boolean; token: string; customer: CustomerAccount }>('/api/customer/register', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    login: (body: { phone: string; password: string }) =>
+      apiFetch<{ success: boolean; token: string; customer: CustomerAccount }>('/api/customer/login', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    me: () =>
+      apiFetch<{ success: boolean; customer: CustomerAccount }>('/api/customer/me', {
+        headers: { 'Content-Type': 'application/json', ...customerAuth.header() },
+      }),
+    myOrders: () =>
+      apiFetch<{ success: boolean; orders: CustomerOrderSummary[] }>('/api/customer/me/orders', {
+        headers: { 'Content-Type': 'application/json', ...customerAuth.header() },
+      }),
+  },
+};
+
+// ── Customer session (localStorage token) ─────────────────────────────────────
+
+export interface CustomerAccount {
+  id: string;
+  phone: string;
+  name?: string | null;
+  createdAt: string;
+}
+
+export interface CustomerOrderSummary {
+  id: string;
+  orderNumber: string;
+  status: string;
+  total: number;
+  createdAt: string;
+  items: { name: string; quantity: number }[];
+}
+
+const CUSTOMER_TOKEN_KEY = 'mamali_customer_token';
+
+export const customerAuth = {
+  getToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(CUSTOMER_TOKEN_KEY);
+  },
+  setToken(token: string): void {
+    localStorage.setItem(CUSTOMER_TOKEN_KEY, token);
+  },
+  clear(): void {
+    localStorage.removeItem(CUSTOMER_TOKEN_KEY);
+  },
+  isLoggedIn(): boolean {
+    return this.getToken() !== null;
+  },
+  header(): Record<string, string> {
+    const token = this.getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  },
 };
 
 // ── Utilities ─────────────────────────────────────────────────────────────────

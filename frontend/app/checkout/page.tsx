@@ -36,6 +36,7 @@ export default function CheckoutPage() {
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [notes, setNotes] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [couponCode, setCouponCode] = useState('');
   const [couponStatus, setCouponStatus] = useState<'idle' | 'applying' | 'applied' | 'error'>('idle');
@@ -150,6 +151,7 @@ export default function CheckoutPage() {
       const orderRes = await api.orders.create({
         customerName: name || undefined,
         customerPhone: formatted,
+        notes: notes.trim() || undefined,
         couponCode: couponStatus === 'applied' ? couponCode.trim() : undefined,
         items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
       });
@@ -270,6 +272,24 @@ export default function CheckoutPage() {
                 hint="Format: 07XXXXXXXX or 2547XXXXXXXX"
                 required
               />
+
+              <div>
+                <label htmlFor="delivery-notes" className="mb-1 block text-sm font-medium text-gray-700">
+                  Delivery Location &amp; Notes (optional)
+                </label>
+                <textarea
+                  id="delivery-notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  maxLength={500}
+                  placeholder="e.g. Westlands, Delta Towers — call when you arrive"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  Where should we deliver? Landmarks and directions help us reach you faster.
+                </p>
+              </div>
 
               {/* Coupon code */}
               <div>

@@ -1,12 +1,12 @@
 import Link from 'next/link';
 
-export function Footer() {
+export function Footer({ businessName = 'MAMALI' }: Readonly<{ businessName?: string }>) {
   return (
     <footer className="border-t border-gray-200 bg-gray-50 py-10 mt-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           <div className="col-span-2 md:col-span-1">
-            <span className="text-xl font-extrabold text-blue-600">MAMALI</span>
+            <span className="text-xl font-extrabold text-blue-600">{businessName}</span>
             <p className="mt-2 text-sm text-gray-500">
               Your trusted digital commerce partner.
             </p>
@@ -16,6 +16,7 @@ export function Footer() {
             <h3 className="text-sm font-semibold text-gray-900">Shop</h3>
             <ul className="mt-3 space-y-2 text-sm text-gray-600">
               <li><Link href="/products" className="hover:text-blue-600">All Products</Link></li>
+              <li><Link href="/orders" className="hover:text-blue-600">Track Order</Link></li>
             </ul>
           </div>
 
@@ -27,6 +28,9 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/contact" className="hover:text-blue-600">Contact</Link>
+              </li>
+              <li>
+                <Link href="/faq" className="hover:text-blue-600">FAQ</Link>
               </li>
             </ul>
           </div>
@@ -45,7 +49,7 @@ export function Footer() {
         </div>
 
         <div className="mt-8 border-t border-gray-200 pt-6 text-center text-xs text-gray-400">
-          &copy; {new Date().getFullYear()} MAMALI. All rights reserved.
+          &copy; {new Date().getFullYear()} {businessName}. All rights reserved.
         </div>
       </div>
     </footer>

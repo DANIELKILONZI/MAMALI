@@ -66,17 +66,20 @@ npm run dev    # starts on http://localhost:3001
 
 ### 🛍️ Customer Experience
 - Browse categories & subcategories with search + price filters
-- Product pages with images, rich descriptions, stock status
+- Global product search and category navigation in the header
+- Product pages with images, rich descriptions, stock status, and per-product SEO/OG metadata
 - Shopping cart with live totals (persisted in localStorage)
-- Checkout with Kenyan phone validation → M-Pesa STK push
-- Order tracking with live status progress
+- Checkout with Kenyan phone validation, delivery location/notes → M-Pesa STK push
+- Order tracking with live status progress + order lookup by order number
+- CMS-driven content pages (About, Contact, FAQ, Privacy, Terms)
+- Store branding (name, logo) driven by admin Store Settings
 
 ### 🏢 Business Control (Owner)
 - Product CRUD with images, rich descriptions, discount pricing
 - Category & subcategory management
 - Advertisement system (banners, featured, promotions) with scheduling
-- Dynamic homepage CMS (hero, sections)
-- Content pages (About, Contact, FAQ, Policies)
+- Dynamic homepage CMS (hero, sections) — section order, visibility, and titles rendered on the storefront
+- Content pages (About, Contact, FAQ, Policies) — published at `/{slug}` on the storefront
 - Business dashboard: revenue, orders, top products, low-stock alerts
 
 ### 👥 Operations (Staff)

@@ -151,10 +151,21 @@ function OrderDetailPage() {
           {/* Customer */}
           <div className="bg-white rounded-lg shadow p-5">
             <h3 className="font-semibold text-gray-900 mb-3">Customer</h3>
+            {order.customerName && (
+              <p className="text-sm font-medium text-gray-900 mb-1">{order.customerName}</p>
+            )}
             <p className="text-sm text-gray-700">📱 {order.customerPhone}</p>
             <p className="text-xs text-gray-400 mt-1">
               Placed: {new Date(order.createdAt).toLocaleString()}
             </p>
+            {order.notes && (
+              <div className="mt-3 rounded border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-1">
+                  Delivery Notes
+                </p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{order.notes}</p>
+              </div>
+            )}
           </div>
 
           {/* Update Status */}

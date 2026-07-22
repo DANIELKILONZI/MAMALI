@@ -26,13 +26,14 @@ export const authLimiter = rateLimit({
  */
 const phoneOrderCounts = new Map<string, { count: number; resetAt: number }>();
 
-// Clean up stale entries every 15 minutes to prevent memory growth
+// Clean up stale entries every 15 minutes to prevent memory growth.
+// unref() so this housekeeping timer never keeps the process alive.
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of phoneOrderCounts.entries()) {
     if (entry.resetAt <= now) phoneOrderCounts.delete(key);
   }
-}, 15 * 60 * 1000);
+}, 15 * 60 * 1000).unref();
 
 const MAX_ORDERS_PER_HOUR = 5;
 const CHECKOUT_WINDOW_MS = 60 * 60 * 1000; // 1 hour

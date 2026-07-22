@@ -8,19 +8,25 @@
  */
 
 import { seedIntegrationData, cleanIntegrationData, IntegrationFixtures } from '../helpers/setup';
+import { startTestServer, TestServer } from '../helpers/testServer';
 import { prisma } from '../../lib/prisma';
 
 const PREFIX = 'INT_FRD_';
-const BASE = 'http://localhost:5000';
+
+let server: TestServer;
+let BASE: string;
 
 let fixtures: IntegrationFixtures;
 
 beforeAll(async () => {
+  server = await startTestServer();
+  BASE = server.baseUrl;
   fixtures = await seedIntegrationData(PREFIX);
 }, 20000);
 
 afterAll(async () => {
   await cleanIntegrationData(PREFIX);
+  await server.close();
   await prisma.$disconnect();
 }, 20000);
 
@@ -39,6 +45,19 @@ async function getOrder(orderId: string) {
     where: { id: orderId },
     select: { riskScore: true, riskFlags: true },
   });
+}
+
+/**
+ * Risk assessment runs fire-and-forget after the 201 response, so poll
+ * until the score lands (or time out and return whatever is there).
+ */
+async function waitForRisk(orderId: string, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const order = await getOrder(orderId);
+    if ((order && order.riskScore > 0) || Date.now() >= deadline) return order;
+    await new Promise((r) => setTimeout(r, 100));
+  }
 }
 
 // ── Fraud score persisted on created order ────────────────────────────────────
@@ -124,7 +143,7 @@ describe('POST /api/orders — phone velocity raises risk score', () => {
     const body = await res.json() as { order: { id: string } };
     createdOrderIds.push(body.order.id);
 
-    const order = await getOrder(body.order.id);
+    const order = await waitForRisk(body.order.id);
     expect(order!.riskScore).toBeGreaterThanOrEqual(15);
     // Flags stored as JSON string in DB
     const flags = JSON.parse(order!.riskFlags as unknown as string) as string[];
@@ -140,7 +159,7 @@ describe('POST /api/orders — phone velocity raises risk score', () => {
     const body = await res.json() as { order: { id: string } };
     createdOrderIds.push(body.order.id);
 
-    const order = await getOrder(body.order.id);
+    const order = await waitForRisk(body.order.id);
     expect(order!.riskScore).toBeGreaterThanOrEqual(40);
     const flags = JSON.parse(order!.riskFlags as unknown as string) as string[];
     expect(flags).toContain('HIGH_ORDER_VELOCITY');
@@ -187,7 +206,7 @@ describe('POST /api/orders — high-value order amount risk', () => {
 
     if (res.status === 201) {
       const body = await res.json() as { order: { id: string } };
-      const order = await getOrder(body.order.id);
+      const order = await waitForRisk(body.order.id);
       expect(order!.riskScore).toBeGreaterThanOrEqual(10);
       const flags = JSON.parse(order!.riskFlags as unknown as string) as string[];
       expect(flags).toContain('HIGH_ORDER_AMOUNT');

@@ -6,16 +6,21 @@
  */
 
 import { seedIntegrationData, cleanIntegrationData, IntegrationFixtures } from '../helpers/setup';
+import { startTestServer, TestServer } from '../helpers/testServer';
 import { prisma } from '../../lib/prisma';
 
 const PREFIX = 'INT_CST_';
-const BASE = 'http://localhost:5000';
 const TEST_PHONE_BLOCK = '254999902001';
 const TEST_PHONE_VIP = '254999902002';
+
+let server: TestServer;
+let BASE: string;
 
 let fixtures: IntegrationFixtures;
 
 beforeAll(async () => {
+  server = await startTestServer();
+  BASE = server.baseUrl;
   fixtures = await seedIntegrationData(PREFIX);
 
   // Seed a "VIP" customer: 3 paid orders totalling > KES 5000
@@ -59,6 +64,7 @@ afterAll(async () => {
   });
 
   await cleanIntegrationData(PREFIX);
+  await server.close();
   await prisma.$disconnect();
 }, 20000);
 

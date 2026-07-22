@@ -5,19 +5,25 @@
  */
 
 import { seedIntegrationData, cleanIntegrationData, IntegrationFixtures } from '../helpers/setup';
+import { startTestServer, TestServer } from '../helpers/testServer';
 import { prisma } from '../../lib/prisma';
 
 const PREFIX = 'INT_CPN_';
-const BASE = 'http://localhost:5000';
+
+let server: TestServer;
+let BASE: string;
 
 let fixtures: IntegrationFixtures;
 
 beforeAll(async () => {
+  server = await startTestServer();
+  BASE = server.baseUrl;
   fixtures = await seedIntegrationData(PREFIX);
 }, 20000);
 
 afterAll(async () => {
   await cleanIntegrationData(PREFIX);
+  await server.close();
   await prisma.$disconnect();
 }, 20000);
 

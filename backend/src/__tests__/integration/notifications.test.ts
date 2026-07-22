@@ -14,16 +14,21 @@
  */
 
 import { seedIntegrationData, cleanIntegrationData, IntegrationFixtures } from '../helpers/setup';
+import { startTestServer, TestServer } from '../helpers/testServer';
 import { prisma } from '../../lib/prisma';
 
 const PREFIX = 'INT_NTF_';
-const BASE = 'http://localhost:5000';
 const TEST_PHONE = '254999904001';
+
+let server: TestServer;
+let BASE: string;
 
 let fixtures: IntegrationFixtures;
 let createdOrderId: string | null = null;
 
 beforeAll(async () => {
+  server = await startTestServer();
+  BASE = server.baseUrl;
   fixtures = await seedIntegrationData(PREFIX);
 
   // Create an order so that a notification log is generated
@@ -52,6 +57,7 @@ afterAll(async () => {
     await prisma.order.delete({ where: { id: createdOrderId } }).catch(() => {});
   }
   await cleanIntegrationData(PREFIX);
+  await server.close();
   await prisma.$disconnect();
 }, 20000);
 
@@ -123,33 +129,30 @@ describe('GET /api/admin/notifications — list notifications', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 200 with notifications array for authenticated admin', async () => {
+  it('returns 200 with logs array for authenticated admin', async () => {
     const res = await getNotifications();
     expect(res.status).toBe(200);
-    const body = await res.json() as { success: boolean; notifications: unknown[] };
+    const body = await res.json() as { success: boolean; logs: unknown[] };
     expect(body.success).toBe(true);
-    expect(Array.isArray(body.notifications)).toBe(true);
+    expect(Array.isArray(body.logs)).toBe(true);
   });
 
   it('response includes summary counts (sent / pending / failed)', async () => {
     const res = await getNotifications();
     const body = await res.json() as {
       success: boolean;
-      summary?: { sent: number; pending: number; failed: number };
+      summary: { totalSent: number; totalPending: number; totalFailed: number };
     };
-    // Summary KPIs may be in the response
-    if (body.summary) {
-      expect(typeof body.summary.sent).toBe('number');
-      expect(typeof body.summary.pending).toBe('number');
-      expect(typeof body.summary.failed).toBe('number');
-    }
+    expect(typeof body.summary.totalSent).toBe('number');
+    expect(typeof body.summary.totalPending).toBe('number');
+    expect(typeof body.summary.totalFailed).toBe('number');
   });
 
   it('filter by status=sent returns only sent notifications', async () => {
     const res = await getNotifications({ status: 'sent' });
     expect(res.status).toBe(200);
-    const body = await res.json() as { notifications: { status: string }[] };
-    for (const n of body.notifications) {
+    const body = await res.json() as { logs: { status: string }[] };
+    for (const n of body.logs) {
       expect(n.status.toLowerCase()).toBe('sent');
     }
   });
@@ -157,8 +160,8 @@ describe('GET /api/admin/notifications — list notifications', () => {
   it('filter by status=failed returns only failed notifications', async () => {
     const res = await getNotifications({ status: 'failed' });
     expect(res.status).toBe(200);
-    const body = await res.json() as { notifications: { status: string }[] };
-    for (const n of body.notifications) {
+    const body = await res.json() as { logs: { status: string }[] };
+    for (const n of body.logs) {
       expect(n.status.toLowerCase()).toBe('failed');
     }
   });
@@ -166,8 +169,8 @@ describe('GET /api/admin/notifications — list notifications', () => {
   it('filter by channel=whatsapp returns only whatsapp notifications', async () => {
     const res = await getNotifications({ channel: 'whatsapp' });
     expect(res.status).toBe(200);
-    const body = await res.json() as { notifications: { channel: string }[] };
-    for (const n of body.notifications) {
+    const body = await res.json() as { logs: { channel: string }[] };
+    for (const n of body.logs) {
       expect(n.channel.toLowerCase()).toBe('whatsapp');
     }
   });
@@ -175,8 +178,8 @@ describe('GET /api/admin/notifications — list notifications', () => {
   it('filter by channel=sms returns only sms notifications', async () => {
     const res = await getNotifications({ channel: 'sms' });
     expect(res.status).toBe(200);
-    const body = await res.json() as { notifications: { channel: string }[] };
-    for (const n of body.notifications) {
+    const body = await res.json() as { logs: { channel: string }[] };
+    for (const n of body.logs) {
       expect(n.channel.toLowerCase()).toBe('sms');
     }
   });

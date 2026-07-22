@@ -14,6 +14,9 @@ module.exports = {
   testPathIgnorePatterns: ['/node_modules/', '/dist/'],
   // Integration tests need longer timeout because they hit SQLite
   testTimeout: 15000,
+  // Integration suites share one SQLite file; parallel workers cause
+  // write-lock contention and flaky 500s, so run suites serially.
+  maxWorkers: 1,
   // Show verbose output per test
   verbose: true,
   // Separate setup for unit vs integration (helpers mounted per-suite in beforeAll)

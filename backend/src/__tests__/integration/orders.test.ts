@@ -5,27 +5,27 @@
  * Seeds test data before all tests and cleans up after all tests.
  */
 
-import app from '../../index';
 import { prisma } from '../../lib/prisma';
 import { seedIntegrationData, cleanIntegrationData, IntegrationFixtures } from '../helpers/setup';
-
-// All tests call the running server via fetch (localhost:5000).
-// The app import keeps the module graph intact for Jest environment setup.
-void app;
+import { startTestServer, TestServer } from '../helpers/testServer';
 
 const PREFIX = 'INT_ORD_';
 const TEST_PHONE = '254999901001';
 
-const BASE = 'http://localhost:5000';
+let server: TestServer;
+let BASE: string;
 
 let fixtures: IntegrationFixtures;
 
 beforeAll(async () => {
+  server = await startTestServer();
+  BASE = server.baseUrl;
   fixtures = await seedIntegrationData(PREFIX);
 }, 20000);
 
 afterAll(async () => {
   await cleanIntegrationData(PREFIX);
+  await server.close();
   await prisma.$disconnect();
 }, 20000);
 

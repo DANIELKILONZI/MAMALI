@@ -73,6 +73,28 @@ export async function expireOrder(orderId: string): Promise<boolean> {
         data: { stock: { increment: item.quantity } },
       });
     }
+
+    await releaseCouponSlot(tx, orderId);
     return true;
+  });
+}
+
+/**
+ * Returns a coupon usage slot consumed by an order that never completed.
+ * usedCount is incremented at order creation, so a cancelled/expired order
+ * would otherwise permanently burn a limited coupon's slot.
+ */
+export async function releaseCouponSlot(
+  tx: Pick<typeof prisma, 'order' | 'coupon'>,
+  orderId: string
+): Promise<void> {
+  const order = await tx.order.findUnique({
+    where: { id: orderId },
+    select: { couponCode: true },
+  });
+  if (!order?.couponCode) return;
+  await tx.coupon.updateMany({
+    where: { code: order.couponCode, usedCount: { gt: 0 } },
+    data: { usedCount: { decrement: 1 } },
   });
 }

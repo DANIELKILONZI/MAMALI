@@ -259,11 +259,60 @@ export function sendOrderExpired(data: OrderNotificationData): void {
 
 // ─── Retry failed notifications ───────────────────────────────────────────────
 
+interface RetryableLog {
+  id: string;
+  channel: string;
+  recipient: string;
+  body: string | null;
+  externalId: string | null;
+  sentAt: Date | null;
+}
+
+/**
+ * Re-attempts delivery of an existing NotificationLog entry, updating the
+ * SAME row (never creating a duplicate). Shared by the retry job and the
+ * admin resend endpoint. Returns the resulting status.
+ */
+export async function retryNotificationLog(log: RetryableLog): Promise<string> {
+  let externalId: string | undefined;
+  let error: string | undefined;
+  let status = 'failed';
+
+  try {
+    if (log.channel === 'whatsapp' && isWhatsAppEnabled()) {
+      const result = await sendWhatsAppText(log.recipient, log.body ?? '');
+      externalId = result.messageId;
+      status = 'sent';
+    } else if (isSMSEnabled()) {
+      const result = await sendSMS(log.recipient, log.body ?? '');
+      externalId = result.messageId;
+      status = 'sent';
+    }
+  } catch (err) {
+    error = String(err);
+  }
+
+  await prisma.notificationLog.update({
+    where: { id: log.id },
+    data: {
+      status,
+      externalId: externalId ?? log.externalId,
+      error: error ?? null,
+      retryCount: { increment: 1 },
+      sentAt: status === 'sent' ? new Date() : log.sentAt,
+    },
+  });
+  return status;
+}
+
 /**
  * Retry unsent/failed notifications from the last 24 hours.
  * Called by the background job scheduler.
  */
 export async function retryFailedNotifications(): Promise<void> {
+  // With no channel enabled a retry can only mark rows failed — don't.
+  if (!isWhatsAppEnabled() && !isSMSEnabled()) return;
+
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const pending = await prisma.notificationLog.findMany({
@@ -277,34 +326,7 @@ export async function retryFailedNotifications(): Promise<void> {
   });
 
   for (const log of pending) {
-    let externalId: string | undefined;
-    let error: string | undefined;
-    let status = 'failed';
-
-    try {
-      if (log.channel === 'whatsapp' && isWhatsAppEnabled()) {
-        const result = await sendWhatsAppText(log.recipient, log.body ?? '');
-        externalId = result.messageId;
-        status = 'sent';
-      } else if (isSMSEnabled()) {
-        const result = await sendSMS(log.recipient, log.body ?? '');
-        externalId = result.messageId;
-        status = 'sent';
-      }
-    } catch (err) {
-      error = String(err);
-    }
-
-    await prisma.notificationLog.update({
-      where: { id: log.id },
-      data: {
-        status,
-        externalId: externalId ?? log.externalId,
-        error: error ?? null,
-        retryCount: { increment: 1 },
-        sentAt: status === 'sent' ? new Date() : log.sentAt,
-      },
-    });
+    await retryNotificationLog(log);
   }
 
   if (pending.length > 0) {

@@ -6,8 +6,9 @@ import { authenticate, authorize } from '../middleware/auth';
 import { checkoutRateLimiter } from '../middleware/rateLimiter';
 import { logger, dbLog } from '../utils/logger';
 import { assessOrderRisk } from '../services/fraud';
-import { sendOrderConfirmation, sendOrderCancellation } from '../services/notifications';
+import { sendOrderConfirmation, sendOrderCancellation, sendOrderShipped, sendOrderDelivered } from '../services/notifications';
 import { normalizePhone } from '../utils/phone';
+import { releaseCouponSlot } from '../services/orderLifecycle';
 
 const router = Router();
 
@@ -111,31 +112,45 @@ router.post('/', checkoutRateLimiter, async (req: Request, res: Response, next: 
 
       const subtotal = orderItems.reduce((s, i) => s + i.total, 0);
 
-      // Apply coupon if provided
+      // Apply coupon if provided. Any failed re-validation is a hard 400 —
+      // silently creating the order at full price after the customer saw a
+      // discount at preview would be a silent overcharge.
       let discountAmount = 0;
       let resolvedCouponCode: string | undefined;
       if (data.couponCode) {
+        const couponError = (message: string) =>
+          Object.assign(new Error(message), { statusCode: 400 });
+
         const coupon = await tx.coupon.findUnique({ where: { code: data.couponCode.toUpperCase() } });
-        if (coupon && coupon.isActive && (!coupon.expiresAt || coupon.expiresAt >= new Date()) &&
-            subtotal >= coupon.minOrderValue) {
-          // Atomically increment usedCount only if still under the limit.
-          // Using updateMany with usedCount < maxUses in the WHERE clause ensures
-          // the check-and-increment is a single atomic database operation.
-          const usedCountWhere = coupon.maxUses !== null
-            ? { usedCount: { lt: coupon.maxUses } }
-            : {};
-          const updated = await tx.coupon.updateMany({
-            where: { id: coupon.id, isActive: true, ...usedCountWhere },
-            data: { usedCount: { increment: 1 } },
-          });
-          if (updated.count > 0) {
-            discountAmount = coupon.discountType === 'percent'
-              ? Math.min(subtotal, (subtotal * coupon.discountValue) / 100)
-              : Math.min(subtotal, coupon.discountValue);
-            discountAmount = Math.round(discountAmount * 100) / 100;
-            resolvedCouponCode = coupon.code;
-          }
+        if (!coupon || !coupon.isActive) {
+          throw couponError('This coupon is not valid');
         }
+        if (coupon.expiresAt && coupon.expiresAt < new Date()) {
+          throw couponError('This coupon has expired');
+        }
+        if (subtotal < coupon.minOrderValue) {
+          throw couponError(`This coupon requires a minimum order of KSh ${coupon.minOrderValue}`);
+        }
+
+        // Atomically increment usedCount only if still under the limit.
+        // Using updateMany with usedCount < maxUses in the WHERE clause ensures
+        // the check-and-increment is a single atomic database operation.
+        const usedCountWhere = coupon.maxUses !== null
+          ? { usedCount: { lt: coupon.maxUses } }
+          : {};
+        const updated = await tx.coupon.updateMany({
+          where: { id: coupon.id, isActive: true, ...usedCountWhere },
+          data: { usedCount: { increment: 1 } },
+        });
+        if (updated.count === 0) {
+          throw couponError('This coupon has reached its usage limit');
+        }
+
+        discountAmount = coupon.discountType === 'percent'
+          ? Math.min(subtotal, (subtotal * coupon.discountValue) / 100)
+          : Math.min(subtotal, coupon.discountValue);
+        discountAmount = Math.round(discountAmount * 100) / 100;
+        resolvedCouponCode = coupon.code;
       }
 
       const total = subtotal - discountAmount;
@@ -339,6 +354,7 @@ router.put('/:id/status', authenticate, authorize('ADMIN', 'STAFF'), async (req:
             data: { stock: { increment: item.quantity } },
           });
         }
+        await releaseCouponSlot(tx, order.id);
         return tx.order.update({ where: { id: order.id }, data: { status: 'cancelled' } });
       });
     } else {
@@ -357,15 +373,20 @@ router.put('/:id/status', authenticate, authorize('ADMIN', 'STAFF'), async (req:
 
     logger.info(`Order ${order.orderNumber} status changed`, { from: order.status, to: status });
 
-    // Fire customer notification for cancellations (non-blocking)
+    // Fire customer notifications for status milestones (non-blocking)
+    const notificationData = {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      customerPhone: order.customerPhone,
+      customerName: order.customerName,
+      total: order.total,
+    };
     if (status === 'cancelled') {
-      sendOrderCancellation({
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        customerPhone: order.customerPhone,
-        customerName: order.customerName,
-        total: order.total,
-      });
+      sendOrderCancellation(notificationData);
+    } else if (status === 'processing') {
+      sendOrderShipped(notificationData);
+    } else if (status === 'delivered') {
+      sendOrderDelivered(notificationData);
     }
 
     res.json({ success: true, order: updated });

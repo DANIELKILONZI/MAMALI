@@ -8,7 +8,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, authorize } from '../middleware/auth';
-import { sendNotification } from '../services/notifications';
+import { retryNotificationLog } from '../services/notifications';
 
 const router = Router();
 
@@ -76,24 +76,16 @@ router.post(
         return;
       }
 
-      // Fire resend (non-blocking) using the unified notification service
-      sendNotification({
-        orderId: log.orderId ?? undefined,
-        recipient: log.recipient,
-        messageType: log.messageType as Parameters<typeof sendNotification>[0]['messageType'],
-        templateData: {
-          orderNumber: log.orderId ?? 'N/A',
-          total: 0,
-        },
-      }).catch(() => {});
+      // Re-deliver the ORIGINAL message body and update the same log row —
+      // rebuilding the message here previously sent wrong content (internal
+      // id as order number, KES 0) and created a duplicate log entry.
+      const status = await retryNotificationLog(log);
 
-      // Mark as pending so the retry job can confirm delivery
-      await prisma.notificationLog.update({
-        where: { id: log.id },
-        data: { status: 'pending', error: null, retryCount: { increment: 1 } },
+      res.json({
+        success: true,
+        status,
+        message: status === 'sent' ? 'Notification resent' : 'Resend attempted but delivery failed',
       });
-
-      res.json({ success: true, message: 'Resend queued' });
     } catch (err) {
       next(err);
     }

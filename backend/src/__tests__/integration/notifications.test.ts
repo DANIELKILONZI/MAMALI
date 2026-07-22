@@ -116,8 +116,8 @@ describe('Order creation — NotificationLog persistence', () => {
     const log = await prisma.notificationLog.findFirst({
       where: { orderId: createdOrderId! },
     });
-    // Status should be sent, failed, or pending
-    expect(['sent', 'failed', 'pending', 'SENT', 'FAILED', 'PENDING']).toContain(log!.status);
+    // Status should be sent, failed, pending, or skipped (no channel enabled)
+    expect(['sent', 'failed', 'pending', 'skipped', 'SENT', 'FAILED', 'PENDING']).toContain(log!.status);
   });
 });
 

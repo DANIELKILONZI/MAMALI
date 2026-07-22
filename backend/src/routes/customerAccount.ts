@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { env } from '../config/env';
 import { customerAuthLimiter } from '../middleware/rateLimiter';
+import { normalizePhone } from '../utils/phone';
 
 /**
  * Optional customer accounts.
@@ -19,14 +20,6 @@ const router = Router();
 interface CustomerToken {
   id: string;
   role: 'CUSTOMER';
-}
-
-/** Normalizes Kenyan phone formats (07.., 01.., +254..) to 254XXXXXXXXX. */
-function normalizePhone(input: string): string | null {
-  const cleaned = input.replace(/[\s-]+/g, '').replace(/^\+/, '');
-  if (/^0[17]\d{8}$/.test(cleaned)) return `254${cleaned.slice(1)}`;
-  if (/^254[17]\d{8}$/.test(cleaned)) return cleaned;
-  return null;
 }
 
 function signToken(customerId: string): string {

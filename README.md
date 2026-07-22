@@ -90,7 +90,7 @@ npm run dev    # starts on http://localhost:3001
 
 ### ⚙️ Core Engine
 - M-Pesa Daraja API: STK push, callback, verification, failure handling
-- Transactional inventory: no negative stock, stock reduced only after payment
+- Transactional inventory: stock reserved at order creation, released on cancellation/expiry
 - Idempotency: duplicate order/payment prevention
 - Order expiry and payment timeout
 - Zod validation on all inputs

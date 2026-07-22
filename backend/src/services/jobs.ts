@@ -1,10 +1,10 @@
 import { prisma } from '../lib/prisma';
 import { logger, dbLog } from '../utils/logger';
 import { verifyTransaction } from './mpesa';
-import { releaseStock } from './inventory';
+import { transitionOrderToPaid, expireOrder } from './orderLifecycle';
 import { retryFailedNotifications, sendOrderExpired, sendPaymentConfirmation } from './notifications';
 
-async function expireUnpaidOrders(): Promise<void> {
+export async function expireUnpaidOrders(): Promise<void> {
   try {
     const now = new Date();
     const expiredOrders = await prisma.order.findMany({
@@ -12,14 +12,16 @@ async function expireUnpaidOrders(): Promise<void> {
         status: { in: ['pending', 'awaiting_payment'] },
         expiresAt: { lt: now },
       },
-      include: { items: true },
+      select: { id: true, orderNumber: true, customerPhone: true, customerName: true, total: true, status: true },
     });
 
     for (const order of expiredOrders) {
       try {
-        await prisma.order.update({ where: { id: order.id }, data: { status: 'cancelled' } });
-
-        await releaseStock(order.items.map((i) => ({ productId: i.productId, quantity: i.quantity })));
+        // Guarded: a payment callback may have flipped this order to paid
+        // (or an admin cancelled it) after the snapshot above. expireOrder
+        // only cancels + releases stock if the order is still unpaid.
+        const expired = await expireOrder(order.id);
+        if (!expired) continue;
 
         await prisma.activityLog.create({
           data: {
@@ -54,7 +56,32 @@ async function expireUnpaidOrders(): Promise<void> {
   }
 }
 
-async function recheckPendingPayments(): Promise<void> {
+/** Guarded paid-transition for a payment confirmed out-of-band (recheck job). */
+async function confirmOrderPaidFromJob(payment: { id: string; orderId: string }): Promise<void> {
+  const result = await transitionOrderToPaid(payment.orderId);
+  if (!result.ok) {
+    // Payment completed but the order was already cancelled (e.g. expired).
+    // Never resurrect — flag for manual refund.
+    await dbLog('warn', 'PAYMENT', 'Payment completed for a non-payable order (manual refund needed)', {
+      paymentId: payment.id,
+      orderId: payment.orderId,
+      orderStatus: result.currentStatus,
+    });
+    return;
+  }
+  logger.info(`Payment ${payment.id} confirmed via background job`);
+
+  // Notify customer (non-blocking) — reconciliation path
+  sendPaymentConfirmation({
+    orderId: result.order.id,
+    orderNumber: result.order.orderNumber,
+    customerPhone: result.order.customerPhone,
+    customerName: result.order.customerName,
+    total: result.order.total,
+  });
+}
+
+export async function recheckPendingPayments(): Promise<void> {
   try {
     const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
     const pendingPayments = await prisma.payment.findMany({
@@ -75,21 +102,7 @@ async function recheckPendingPayments(): Promise<void> {
         if (newStatus !== payment.status) {
           await prisma.payment.update({ where: { id: payment.id }, data: { status: newStatus } });
           if (newStatus === 'completed') {
-            const paidOrder = await prisma.order.update({
-              where: { id: payment.orderId },
-              data: { status: 'paid' },
-              select: { id: true, orderNumber: true, customerPhone: true, customerName: true, total: true },
-            });
-            logger.info(`Payment ${payment.id} confirmed via background job`);
-
-            // Notify customer (non-blocking) — reconciliation path
-            sendPaymentConfirmation({
-              orderId: paidOrder.id,
-              orderNumber: paidOrder.orderNumber,
-              customerPhone: paidOrder.customerPhone,
-              customerName: paidOrder.customerName,
-              total: paidOrder.total,
-            });
+            await confirmOrderPaidFromJob(payment);
           } else {
             await dbLog('warn', 'PAYMENT', 'Pending payment resolved as failed via background job', {
               paymentId: payment.id,

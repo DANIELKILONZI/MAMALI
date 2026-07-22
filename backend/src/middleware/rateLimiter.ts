@@ -1,5 +1,6 @@
 import rateLimit from 'express-rate-limit';
 import type { Request, Response, NextFunction } from 'express';
+import { normalizePhone } from '../utils/phone';
 
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -57,7 +58,9 @@ export function checkoutRateLimiter(req: Request, res: Response, next: NextFunct
   }
 
   const now = Date.now();
-  const key = phone.replace(/\D/g, '');
+  // Canonical form so 0712…, +254712…, and 254712… share one bucket;
+  // unparseable input falls back to digits-only (the handler rejects it anyway).
+  const key = normalizePhone(phone) ?? phone.replace(/\D/g, '');
   const entry = phoneOrderCounts.get(key);
 
   if (!entry || entry.resetAt <= now) {

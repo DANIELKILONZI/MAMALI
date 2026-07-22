@@ -7,6 +7,7 @@ import { checkoutRateLimiter } from '../middleware/rateLimiter';
 import { logger, dbLog } from '../utils/logger';
 import { assessOrderRisk } from '../services/fraud';
 import { sendOrderConfirmation, sendOrderCancellation } from '../services/notifications';
+import { normalizePhone } from '../utils/phone';
 
 const router = Router();
 
@@ -51,6 +52,15 @@ router.post('/', checkoutRateLimiter, async (req: Request, res: Response, next: 
     const ipAddress = (req.ip ?? req.socket?.remoteAddress ?? '').replace('::ffff:', '');
     const userAgent = req.headers['user-agent'] ?? '';
 
+    // Canonicalize the phone before it is used as an identity key
+    // (blocking, fraud velocity, coupon abuse, rate limiting all key on it).
+    const normalizedPhone = normalizePhone(data.customerPhone);
+    if (!normalizedPhone) {
+      res.status(400).json({ success: false, message: 'Enter a valid Kenyan phone number (07XXXXXXXX or 2547XXXXXXXX)' });
+      return;
+    }
+    data.customerPhone = normalizedPhone;
+
     // Reject orders from blocked customers
     const blocked = await prisma.blockedCustomer.findUnique({ where: { phone: data.customerPhone } });
     if (blocked) {
@@ -78,12 +88,19 @@ router.post('/', checkoutRateLimiter, async (req: Request, res: Response, next: 
         throw Object.assign(new Error('Insufficient stock'), { statusCode: 400, outOfStock });
       }
 
-      // Reserve stock within transaction — products were already fetched and validated above
+      // Reserve stock within the transaction. The stock >= quantity guard in
+      // the WHERE makes the check-and-decrement atomic — the snapshot check
+      // above gives friendly errors, but only this guard prevents two
+      // concurrent orders from overselling the last unit (SQLite serializes
+      // writers, PostgreSQL under Read Committed does not).
       for (const item of data.items) {
-        await tx.product.update({
-          where: { id: item.productId },
+        const reserved = await tx.product.updateMany({
+          where: { id: item.productId, stock: { gte: item.quantity } },
           data: { stock: { decrement: item.quantity } },
         });
+        if (reserved.count === 0) {
+          throw Object.assign(new Error('Insufficient stock'), { statusCode: 400, outOfStock: [item.productId] });
+        }
       }
 
       const orderItems = data.items.map((item) => {

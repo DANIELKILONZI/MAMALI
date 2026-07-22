@@ -135,12 +135,12 @@ export async function cleanIntegrationData(prefix = 'INT_'): Promise<void> {
 
   // Remove any BlockedCustomer records from tests
   await prisma.blockedCustomer.deleteMany({
-    where: { phone: { startsWith: '25499999' } },
+    where: { phone: { startsWith: '25479999' } },
   });
 
   // Orders created during tests (identified by customer phone pattern)
   const testOrders = await prisma.order.findMany({
-    where: { customerPhone: { startsWith: '25499999' } },
+    where: { customerPhone: { startsWith: '25479999' } },
     select: { id: true },
   });
   if (testOrders.length > 0) {

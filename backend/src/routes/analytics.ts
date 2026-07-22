@@ -13,7 +13,7 @@ router.get('/revenue', authenticate, authorize('ADMIN'), async (_req: Request, r
 
     const orders = await prisma.order.findMany({
       where: {
-        status: { in: ['paid', 'processing', 'delivered'] },
+        status: { in: [...PAID_ORDER_STATUSES] },
         createdAt: { gte: thirtyDaysAgo },
       },
       select: { total: true, discountAmount: true, createdAt: true },
@@ -59,6 +59,7 @@ router.get('/products', authenticate, authorize('ADMIN'), async (_req: Request, 
     const [allTimeItems, recentItems] = await Promise.all([
       prisma.orderItem.groupBy({
         by: ['productId', 'name'],
+        where: { order: { status: { in: [...PAID_ORDER_STATUSES] } } },
         _sum: { quantity: true, total: true },
         _count: { orderId: true },
       }),
@@ -66,7 +67,7 @@ router.get('/products', authenticate, authorize('ADMIN'), async (_req: Request, 
         by: ['productId'],
         where: {
           order: {
-            status: { in: ['paid', 'processing', 'delivered'] },
+            status: { in: [...PAID_ORDER_STATUSES] },
             createdAt: { gte: thirtyDaysAgo },
           },
         },
@@ -89,7 +90,7 @@ router.get('/products', authenticate, authorize('ADMIN'), async (_req: Request, 
       by: ['productId'],
       where: {
         order: {
-          status: { in: ['paid', 'processing', 'delivered'] },
+          status: { in: [...PAID_ORDER_STATUSES] },
           createdAt: { gte: thirtyDaysAgo },
         },
       },
@@ -144,7 +145,7 @@ router.get('/funnel', authenticate, authorize('ADMIN'), async (_req: Request, re
         where: { createdAt: { gte: thirtyDaysAgo }, status: { in: ['awaiting_payment', 'paid', 'processing', 'delivered'] } },
       }),
       prisma.order.count({
-        where: { createdAt: { gte: thirtyDaysAgo }, status: { in: ['paid', 'processing', 'delivered'] } },
+        where: { createdAt: { gte: thirtyDaysAgo }, status: { in: [...PAID_ORDER_STATUSES] } },
       }),
       prisma.order.count({
         where: { createdAt: { gte: thirtyDaysAgo }, status: 'delivered' },
@@ -189,7 +190,7 @@ router.get('/coupons', authenticate, authorize('ADMIN'), async (_req: Request, r
     const couponStats = await Promise.all(
       coupons.map(async (coupon) => {
         const orders = await prisma.order.aggregate({
-          where: { couponCode: coupon.code, status: { in: ['paid', 'processing', 'delivered'] } },
+          where: { couponCode: coupon.code, status: { in: [...PAID_ORDER_STATUSES] } },
           _sum: { total: true, discountAmount: true },
           _count: { id: true },
         });

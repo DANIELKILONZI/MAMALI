@@ -12,6 +12,7 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
 import { PAID_ORDER_STATUSES } from '../lib/constants';
+import { normalizePhone } from '../utils/phone';
 
 const router = Router();
 
@@ -179,7 +180,8 @@ router.post(
   authorize('ADMIN'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const phone = decodeURIComponent(String(req.params.phone));
+      const rawPhone = decodeURIComponent(String(req.params.phone));
+      const phone = normalizePhone(rawPhone) ?? rawPhone;
       const { reason } = z.object({ reason: z.string().optional() }).parse(req.body);
 
       const blocked = await prisma.blockedCustomer.upsert({
@@ -202,8 +204,10 @@ router.delete(
   authorize('ADMIN'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const phone = decodeURIComponent(String(req.params.phone));
-      await prisma.blockedCustomer.deleteMany({ where: { phone } });
+      const rawPhone = decodeURIComponent(String(req.params.phone));
+      // Delete both canonical and legacy raw-format rows
+      const phones = [rawPhone, normalizePhone(rawPhone)].filter((p): p is string => p !== null);
+      await prisma.blockedCustomer.deleteMany({ where: { phone: { in: phones } } });
       res.json({ success: true });
     } catch (err) {
       next(err);

@@ -14,6 +14,7 @@ export type MessageType =
   | 'order_confirmed'
   | 'payment_confirmed'
   | 'order_shipped'
+  | 'order_delivered'
   | 'order_cancelled'
   | 'order_expired';
 
@@ -45,6 +46,13 @@ function buildMessage(type: MessageType, data: Record<string, unknown>): string 
         `📦 Order On Its Way!\n\n` +
         `Great news! Your order *${orderNumber}* is being delivered to you.\n\n` +
         `*${businessName}*`
+      );
+
+    case 'order_delivered':
+      return (
+        `✅ Order Delivered!\n\n` +
+        `Your order *${orderNumber}* has been delivered.\n` +
+        `Thank you for shopping with *${businessName}*! We hope to see you again soon. 🛍️`
       );
 
     case 'order_cancelled':
@@ -116,9 +124,11 @@ export async function sendNotification(opts: SendNotificationOptions): Promise<v
       externalId = result.messageId;
       status = 'sent';
     } else {
-      // Neither configured — still log as pending so retry job can pick it up later
+      // Neither channel configured — log as 'skipped', NOT pending/failed.
+      // The retry job, failure-rate alert, and health check all ignore
+      // skipped rows; otherwise disabling notifications floods them.
       logger.debug('Notifications disabled; skipping', { recipient, messageType });
-      status = 'pending';
+      status = 'skipped';
     }
   } catch (err) {
     status = 'failed';
@@ -187,6 +197,34 @@ export function sendPaymentConfirmation(data: OrderNotificationData): void {
       customerName: data.customerName,
       businessName: data.businessName,
       mpesaReceiptNumber: data.mpesaReceiptNumber,
+    },
+  }).catch(() => {});
+}
+
+export function sendOrderShipped(data: OrderNotificationData): void {
+  sendNotification({
+    orderId: data.orderId,
+    recipient: data.customerPhone,
+    messageType: 'order_shipped',
+    templateData: {
+      orderNumber: data.orderNumber,
+      total: data.total,
+      customerName: data.customerName,
+      businessName: data.businessName,
+    },
+  }).catch(() => {});
+}
+
+export function sendOrderDelivered(data: OrderNotificationData): void {
+  sendNotification({
+    orderId: data.orderId,
+    recipient: data.customerPhone,
+    messageType: 'order_delivered',
+    templateData: {
+      orderNumber: data.orderNumber,
+      total: data.total,
+      customerName: data.customerName,
+      businessName: data.businessName,
     },
   }).catch(() => {});
 }

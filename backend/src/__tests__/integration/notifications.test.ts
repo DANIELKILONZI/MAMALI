@@ -18,7 +18,7 @@ import { startTestServer, TestServer } from '../helpers/testServer';
 import { prisma } from '../../lib/prisma';
 
 const PREFIX = 'INT_NTF_';
-const TEST_PHONE = '254999904001';
+const TEST_PHONE = '254799904001';
 
 let server: TestServer;
 let BASE: string;

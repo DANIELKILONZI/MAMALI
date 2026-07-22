@@ -77,7 +77,7 @@ describe('POST /api/orders — fraud risk assessment is run', () => {
 
   it('persists a riskScore (0–100) on every created order', async () => {
     const res = await createOrder({
-      customerPhone: '254999903001',
+      customerPhone: '254799903001',
       customerName: 'Fraud Integration Test',
       items: [{ productId: fixtures.productId, quantity: 1 }],
     });
@@ -108,7 +108,7 @@ describe('POST /api/orders — fraud risk assessment is run', () => {
 // ── Velocity-based risk elevation ─────────────────────────────────────────────
 
 describe('POST /api/orders — phone velocity raises risk score', () => {
-  const VELOCITY_PHONE = '254999903010';
+  const VELOCITY_PHONE = '254799903010';
   const createdOrderIds: string[] = [];
 
   afterAll(async () => {
@@ -172,7 +172,7 @@ describe('POST /api/orders — high-value order amount risk', () => {
   afterAll(async () => {
     // Cleanup high-value test orders
     const orders = await prisma.order.findMany({
-      where: { customerPhone: '254999903020' },
+      where: { customerPhone: '254799903020' },
       select: { id: true },
     });
     for (const { id } of orders) {
@@ -200,7 +200,7 @@ describe('POST /api/orders — high-value order amount risk', () => {
     });
 
     const res = await createOrder({
-      customerPhone: '254999903020',
+      customerPhone: '254799903020',
       items: [{ productId: expensiveProduct.id, quantity: 1 }],
     });
 
@@ -220,7 +220,7 @@ describe('POST /api/orders — high-value order amount risk', () => {
 // ── Coupon abuse risk ──────────────────────────────────────────────────────────
 
 describe('POST /api/orders — coupon abuse risk scoring', () => {
-  const ABUSE_PHONE = '254999903030';
+  const ABUSE_PHONE = '254799903030';
   const createdOrderIds: string[] = [];
 
   afterAll(async () => {
@@ -253,7 +253,7 @@ describe('POST /api/orders — coupon abuse risk scoring', () => {
 // ── Rate limiter enforcement ──────────────────────────────────────────────────
 
 describe('POST /api/orders — checkout rate limiter (5 orders/phone/hour)', () => {
-  const RL_PHONE = '254999903099';
+  const RL_PHONE = '254799903099';
   const createdOrderIds: string[] = [];
 
   afterAll(async () => {

@@ -10,8 +10,8 @@ import { startTestServer, TestServer } from '../helpers/testServer';
 import { prisma } from '../../lib/prisma';
 
 const PREFIX = 'INT_CST_';
-const TEST_PHONE_BLOCK = '254999902001';
-const TEST_PHONE_VIP = '254999902002';
+const TEST_PHONE_BLOCK = '254799902001';
+const TEST_PHONE_VIP = '254799902002';
 
 let server: TestServer;
 let BASE: string;

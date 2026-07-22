@@ -28,14 +28,15 @@ export async function checkAvailability(items: StockItem[]): Promise<{ available
 export async function reserveStock(items: StockItem[]): Promise<void> {
   await prisma.$transaction(async (tx: TransactionClient) => {
     for (const item of items) {
-      const product = await tx.product.findUnique({ where: { id: item.productId } });
-      if (!product || product.stock < item.quantity) {
-        throw new Error(`Insufficient stock for product ${item.productId}`);
-      }
-      await tx.product.update({
-        where: { id: item.productId },
+      // Atomic check-and-decrement: the stock >= quantity guard in the WHERE
+      // prevents concurrent reservations from driving stock negative.
+      const reserved = await tx.product.updateMany({
+        where: { id: item.productId, stock: { gte: item.quantity } },
         data: { stock: { decrement: item.quantity } },
       });
+      if (reserved.count === 0) {
+        throw new Error(`Insufficient stock for product ${item.productId}`);
+      }
     }
   });
   logger.info('Stock reserved', { items });

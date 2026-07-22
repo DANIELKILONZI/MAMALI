@@ -10,7 +10,7 @@ import { seedIntegrationData, cleanIntegrationData, IntegrationFixtures } from '
 import { startTestServer, TestServer } from '../helpers/testServer';
 
 const PREFIX = 'INT_ORD_';
-const TEST_PHONE = '254999901001';
+const TEST_PHONE = '254799901001';
 
 let server: TestServer;
 let BASE: string;
@@ -67,19 +67,19 @@ describe('POST /api/orders — validation', () => {
 describe('POST /api/orders — blocked customer', () => {
   beforeAll(async () => {
     await prisma.blockedCustomer.upsert({
-      where: { phone: '254999901099' },
+      where: { phone: '254799901099' },
       update: {},
-      create: { phone: '254999901099', reason: 'Integration test block' },
+      create: { phone: '254799901099', reason: 'Integration test block' },
     });
   });
 
   afterAll(async () => {
-    await prisma.blockedCustomer.deleteMany({ where: { phone: '254999901099' } });
+    await prisma.blockedCustomer.deleteMany({ where: { phone: '254799901099' } });
   });
 
   it('returns 403 for a blocked customer phone', async () => {
     const res = await createOrder({
-      customerPhone: '254999901099',
+      customerPhone: '254799901099',
       items: [{ productId: fixtures.productId, quantity: 1 }],
     });
     expect(res.status).toBe(403);

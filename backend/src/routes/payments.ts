@@ -6,6 +6,7 @@ import { generateIdempotencyKey, isRequestProcessed, markRequestProcessed } from
 import { logger, dbLog } from '../utils/logger';
 import { authenticate, authorize } from '../middleware/auth';
 import { sendPaymentConfirmation } from '../services/notifications';
+import { transitionOrderToPaid } from '../services/orderLifecycle';
 
 const router = Router();
 
@@ -111,6 +112,13 @@ router.post('/callback', async (req: Request, res: Response, next: NextFunction)
       return;
     }
 
+    // Safaricom retries callbacks; a payment that already reached a final
+    // state must not be reprocessed (duplicate confirmations/logs).
+    if (payment.status === 'completed') {
+      res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
+      return;
+    }
+
     let mpesaReceiptNumber: string | undefined;
     if (ResultCode === 0 && CallbackMetadata?.Item) {
       const items = CallbackMetadata.Item as Array<{ Name: string; Value: unknown }>;
@@ -131,11 +139,26 @@ router.post('/callback', async (req: Request, res: Response, next: NextFunction)
     });
 
     if (status === 'completed') {
-      const paidOrder = await prisma.order.update({
-        where: { id: payment.orderId },
-        data: { status: 'paid' },
-        select: { id: true, orderNumber: true, customerPhone: true, customerName: true, total: true },
-      });
+      // Guarded: never resurrect an order the expiry job (or an admin)
+      // already cancelled — its stock is gone. Flag for manual refund.
+      const result = await transitionOrderToPaid(payment.orderId);
+      if (!result.ok) {
+        await prisma.activityLog.create({
+          data: {
+            orderId: payment.orderId,
+            action: 'PAYMENT_AFTER_CANCEL',
+            details: JSON.stringify({ mpesaReceiptNumber, amount: payment.amount, orderStatus: result.currentStatus }),
+          },
+        });
+        await dbLog('warn', 'PAYMENT', 'Payment completed for a non-payable order (manual refund needed)', {
+          orderId: payment.orderId,
+          orderStatus: result.currentStatus,
+          mpesaReceiptNumber,
+        });
+        res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
+        return;
+      }
+
       await prisma.activityLog.create({
         data: {
           orderId: payment.orderId,
@@ -146,11 +169,11 @@ router.post('/callback', async (req: Request, res: Response, next: NextFunction)
 
       // Fire payment-confirmation notification (non-blocking)
       sendPaymentConfirmation({
-        orderId: paidOrder.id,
-        orderNumber: paidOrder.orderNumber,
-        customerPhone: paidOrder.customerPhone,
-        customerName: paidOrder.customerName,
-        total: paidOrder.total,
+        orderId: result.order.id,
+        orderNumber: result.order.orderNumber,
+        customerPhone: result.order.customerPhone,
+        customerName: result.order.customerName,
+        total: result.order.total,
         mpesaReceiptNumber,
       });
     } else {
@@ -234,7 +257,24 @@ router.post('/reconcile', authenticate, authorize('ADMIN'), async (req: Request,
             data: { status: newStatus, resultCode: String(resultCode) },
           });
           if (newStatus === 'completed') {
-            await prisma.order.update({ where: { id: payment.orderId }, data: { status: 'paid' } });
+            const transition = await transitionOrderToPaid(payment.orderId);
+            if (!transition.ok) {
+              await dbLog('warn', 'PAYMENT', 'Payment completed for a non-payable order (manual refund needed)', {
+                paymentId: payment.id,
+                orderId: payment.orderId,
+                orderStatus: transition.currentStatus,
+              });
+              results.push({ paymentId: payment.id, orderId: payment.orderId, status: newStatus, action: 'payment_after_cancel' });
+              continue;
+            }
+            // Notify customer (non-blocking) — parity with the callback path
+            sendPaymentConfirmation({
+              orderId: transition.order.id,
+              orderNumber: transition.order.orderNumber,
+              customerPhone: transition.order.customerPhone,
+              customerName: transition.order.customerName,
+              total: transition.order.total,
+            });
           }
           results.push({ paymentId: payment.id, orderId: payment.orderId, status: newStatus, action: 'updated' });
         } else {

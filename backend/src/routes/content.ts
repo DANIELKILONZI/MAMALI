@@ -47,6 +47,19 @@ adminContentRouter.get('/', authenticate, authorize('ADMIN'), async (_req: Reque
   }
 });
 
+adminContentRouter.get('/:slug', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const page = await prisma.contentPage.findUnique({ where: { slug: String(req.params.slug) } });
+    if (!page) {
+      res.status(404).json({ success: false, message: 'Page not found' });
+      return;
+    }
+    res.json({ success: true, page });
+  } catch (err) {
+    next(err);
+  }
+});
+
 adminContentRouter.put('/:slug', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = z.object({

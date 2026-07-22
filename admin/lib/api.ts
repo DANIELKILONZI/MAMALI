@@ -1,4 +1,10 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+function getApiUrl(): string {
+  if (typeof window !== 'undefined') {
+    return (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+  }
+
+  return (process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+}
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -13,7 +19,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const res = await fetch(`${getApiUrl()}${path}`, { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
     throw new Error(err.message || `Request failed: ${res.status}`);
@@ -114,29 +120,37 @@ export const adminApi = {
       request<void>(`/api/admin/staff/${id}`, { method: 'DELETE' }),
   },
   advertisements: {
-    list: () => request<Advertisement[]>('/api/admin/advertisements'),
-    get: (id: string) => request<Advertisement>(`/api/admin/advertisements/${id}`),
+    list: () =>
+      request<{ success: boolean; advertisements: Advertisement[] }>('/api/admin/advertisements').then(
+        (r) => r.advertisements
+      ),
+    get: (id: string) =>
+      request<{ success: boolean; advertisement: Advertisement }>(`/api/admin/advertisements/${id}`).then(
+        (r) => r.advertisement
+      ),
     create: (data: Partial<Advertisement>) =>
-      request<Advertisement>('/api/admin/advertisements', {
+      request<{ success: boolean; advertisement: Advertisement }>('/api/admin/advertisements', {
         method: 'POST',
         body: JSON.stringify(data),
-      }),
+      }).then((r) => r.advertisement),
     update: (id: string, data: Partial<Advertisement>) =>
-      request<Advertisement>(`/api/admin/advertisements/${id}`, {
+      request<{ success: boolean; advertisement: Advertisement }>(`/api/admin/advertisements/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
-      }),
+      }).then((r) => r.advertisement),
     delete: (id: string) =>
       request<void>(`/api/admin/advertisements/${id}`, { method: 'DELETE' }),
   },
   content: {
-    list: () => request<ContentPage[]>('/api/admin/content'),
-    get: (slug: string) => request<ContentPage>(`/api/admin/content/${slug}`),
+    list: () =>
+      request<{ success: boolean; pages: ContentPage[] }>('/api/admin/content').then((r) => r.pages),
+    get: (slug: string) =>
+      request<{ success: boolean; page: ContentPage }>(`/api/admin/content/${slug}`).then((r) => r.page),
     update: (slug: string, data: Partial<ContentPage>) =>
-      request<ContentPage>(`/api/admin/content/${slug}`, {
+      request<{ success: boolean; page: ContentPage }>(`/api/admin/content/${slug}`, {
         method: 'PUT',
         body: JSON.stringify(data),
-      }),
+      }).then((r) => r.page),
   },
   homepage: {
     list: () => request<HomepageSection[]>('/api/admin/homepage'),
@@ -299,6 +313,8 @@ export interface Order {
   id: string;
   orderNumber: string;
   customerPhone: string;
+  customerName?: string | null;
+  notes?: string | null;
   status: OrderStatus;
   total: number;
   assignedTo: string | null;

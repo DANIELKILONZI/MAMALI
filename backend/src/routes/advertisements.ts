@@ -53,6 +53,19 @@ adminRouter.get('/', authenticate, authorize('ADMIN'), async (req: Request, res:
   }
 });
 
+adminRouter.get('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const ad = await prisma.advertisement.findUnique({ where: { id: String(req.params.id) } });
+    if (!ad) {
+      res.status(404).json({ success: false, message: 'Advertisement not found' });
+      return;
+    }
+    res.json({ success: true, advertisement: ad });
+  } catch (err) {
+    next(err);
+  }
+});
+
 adminRouter.post('/', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = adSchema.parse(req.body);

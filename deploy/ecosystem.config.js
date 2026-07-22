@@ -1,16 +1,19 @@
 // =============================================================================
 // MAMALI PM2 Ecosystem Configuration
 // Usage:
-//   pm2 start ecosystem.config.js --env production
+//   pm2 start deploy/ecosystem.config.js --env production
 //   pm2 save && pm2 startup
 // =============================================================================
+
+const path = require('path');
+const ROOT  = path.resolve(__dirname, '..');
 
 module.exports = {
   apps: [
     // ─── Backend API ──────────────────────────────────────────────────────
     {
       name: 'mamali-backend',
-      cwd: './backend',
+      cwd: path.join(ROOT, 'backend'),
       script: 'dist/index.js',
       instances: 'max',      // one per CPU core
       exec_mode: 'cluster',
@@ -45,7 +48,7 @@ module.exports = {
     // ─── Customer Storefront ──────────────────────────────────────────────
     {
       name: 'mamali-frontend',
-      cwd: './frontend',
+      cwd: path.join(ROOT, 'frontend'),
       script: 'node_modules/.bin/next',
       args: 'start -p 3000',
       instances: 2,
@@ -73,7 +76,7 @@ module.exports = {
     // ─── Admin Dashboard ──────────────────────────────────────────────────
     {
       name: 'mamali-admin',
-      cwd: './admin',
+      cwd: path.join(ROOT, 'admin'),
       script: 'node_modules/.bin/next',
       args: 'start -p 3001',
       instances: 1,

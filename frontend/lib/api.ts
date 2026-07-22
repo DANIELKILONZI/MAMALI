@@ -1,4 +1,10 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+function getApiUrl(): string {
+  if (typeof window !== 'undefined') {
+    return (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+  }
+
+  return (process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -182,7 +188,7 @@ export interface CartValidationResponse {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${getApiUrl()}${path}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
@@ -223,7 +229,7 @@ export const api = {
       apiFetch<{ success: boolean; product: Product }>(`/api/products/${slug}`),
 
     recordView: (slug: string) =>
-      fetch(`${API_URL}/api/products/${slug}/view`, { method: 'POST' }).catch(() => {}),
+      fetch(`${getApiUrl()}/api/products/${slug}/view`, { method: 'POST' }).catch(() => {}),
 
     search: (query: string, page = 1) =>
       apiFetch<ProductsResponse>(`/api/products${buildQuery({ search: query, page })}`),

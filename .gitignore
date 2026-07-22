@@ -10,6 +10,8 @@ build/
 coverage/
 *.tsbuildinfo
 .DS_Store
+.directory
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

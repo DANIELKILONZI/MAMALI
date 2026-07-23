@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
-import { authenticate, requirePermission } from '../middleware/auth';
+import { authenticate, requirePermission, optionalAuthenticate, callerHasPermission } from '../middleware/auth';
 
 const router = Router();
 
@@ -21,9 +21,9 @@ const productSchema = z.object({
   boostScore: z.number().int().min(0).default(0),
 });
 
-router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', optionalAuthenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { category, search, minPrice, maxPrice, page: pageParam = '1', limit: limitParam = '20', featured } = req.query;
+    const { category, search, minPrice, maxPrice, page: pageParam = '1', limit: limitParam = '20', featured, status } = req.query;
     const page = Math.max(1, parseInt(pageParam as string, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(limitParam as string, 10) || 1));
     const skip = (page - 1) * limit;
@@ -40,7 +40,15 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       return;
     }
 
+    // Shoppers only ever see active products. An admin with products.manage
+    // may filter by status — otherwise deactivated stock would be invisible
+    // (and unrecoverable) in the admin panel.
     const where: Record<string, unknown> = { isActive: true };
+    if (status && (await callerHasPermission(req, 'products.manage'))) {
+      if (status === 'inactive') where.isActive = false;
+      else if (status === 'all') delete where.isActive;
+      else where.isActive = true;
+    }
     if (category) {
       const cat = await prisma.category.findUnique({ where: { slug: category as string } });
       if (cat) where.categoryId = cat.id;

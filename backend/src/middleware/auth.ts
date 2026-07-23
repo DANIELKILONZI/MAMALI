@@ -81,6 +81,32 @@ async function loadAccount(id: string) {
   });
 }
 
+/**
+ * Populates req.user when a valid token is present, but never rejects.
+ * Lets a public endpoint (e.g. the product catalogue) return richer data to
+ * an authenticated admin while staying open to anonymous shoppers.
+ */
+export function optionalAuthenticate(req: Request, _res: Response, next: NextFunction): void {
+  const header = req.headers.authorization;
+  const token = header?.startsWith('Bearer ') ? header.slice(7) : req.cookies?.mamali_access_token;
+  if (token) {
+    try {
+      req.user = jwt.verify(token, env.JWT_SECRET) as AuthUser;
+    } catch {
+      // Anonymous request — carry on without a user.
+    }
+  }
+  next();
+}
+
+/** Permission check for a caller that may or may not be authenticated. */
+export async function callerHasPermission(req: Request, permission: Permission): Promise<boolean> {
+  if (!req.user) return false;
+  const account = await loadAccount(req.user.id);
+  if (!account?.isActive) return false;
+  return hasPermission(account.role, parsePermissions(account.permissions), permission);
+}
+
 /** Requires the caller to be the owner (or a legacy ADMIN). */
 export async function requireOwner(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (!req.user) {

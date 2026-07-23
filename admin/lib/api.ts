@@ -314,12 +314,16 @@ export interface DashboardData {
 export interface Product {
   id: string;
   name: string;
+  slug: string;
   description: string;
+  /** Whole shillings (KES). */
   price: number;
   discount: number;
   stock: number;
-  category: string;
-  categoryId: string;
+  reorderLevel?: number;
+  /** The API returns the related record, not a name string. */
+  category?: { id: string; name: string; slug: string } | null;
+  categoryId: string | null;
   images: string[];
   isActive: boolean;
   isFeatured: boolean;

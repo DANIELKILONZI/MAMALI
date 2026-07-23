@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { adminApi, Product } from '@/lib/api';
 import AdminLayout from '@/components/layout/AdminLayout';
 import DataTable from '@/components/ui/DataTable';
+import PageHeader from '@/components/ui/PageHeader';
+import SearchInput from '@/components/ui/SearchInput';
 import Modal from '@/components/ui/Modal';
 import Pagination from '@/components/ui/Pagination';
 import { withAuth } from '@/context/AuthContext';
@@ -14,7 +16,9 @@ function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  // 'all' by default so deactivated products stay visible and recoverable —
+  // the storefront still only ever shows active ones.
+  const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -34,12 +38,18 @@ function ProductsPage() {
       .finally(() => setIsLoading(false));
   };
 
-  useEffect(() => { fetchProducts(); }, [page, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchProducts(); }, [page, statusFilter, search]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    fetchProducts();
+  /** Apply the same change to every selected product. */
+  const bulkUpdate = async (ids: string[], data: Partial<Product>, label: string, clear: () => void) => {
+    try {
+      await Promise.all(ids.map((id) => adminApi.products.update(id, data)));
+      toast.success(`${ids.length} product${ids.length === 1 ? '' : 's'} ${label}`);
+      clear();
+      fetchProducts();
+    } catch {
+      toast.error('Bulk update failed');
+    }
   };
 
   const handleToggleActive = async (product: Product) => {
@@ -76,7 +86,7 @@ function ProductsPage() {
           )}
           <div>
             <p className="font-medium text-gray-900">{p.name}</p>
-            <p className="text-xs text-gray-500">{p.category}</p>
+            <p className="text-xs text-gray-500">{p.category?.name ?? 'Uncategorised'}</p>
           </div>
         </div>
       ),
@@ -85,7 +95,10 @@ function ProductsPage() {
       key: 'price',
       label: 'Price',
       sortable: true,
-      render: (p: Product) => <span>${p.price?.toFixed(2)}</span>,
+      align: 'right' as const,
+      render: (p: Product) => (
+        <span>KSh {(p.price ?? 0).toLocaleString('en-KE', { maximumFractionDigits: 0 })}</span>
+      ),
     },
     {
       key: 'stock',
@@ -138,45 +151,69 @@ function ProductsPage() {
 
   return (
     <AdminLayout>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Products</h2>
-        <Link
-          href="/products/new"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-        >
-          + Add Product
-        </Link>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4 mb-4 flex gap-3 flex-wrap">
-        <form onSubmit={handleSearch} className="flex gap-2 flex-1">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search products..."
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            className="bg-gray-700 text-white px-4 py-2 rounded-lg text-sm"
+      <PageHeader
+        title="Products"
+        description="Your catalogue. Deactivated products stay here so you can restore them."
+        actions={
+          <Link
+            href="/products/new"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
           >
-            Search
-          </button>
-        </form>
+            + Add product
+          </Link>
+        }
+      />
+
+      <div className="mb-4 flex flex-wrap gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+        <SearchInput
+          value={search}
+          onChange={(v) => { setSearch(v); setPage(1); }}
+          placeholder="Search products by name…"
+          className="min-w-[240px] flex-1"
+        />
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none"
+          aria-label="Filter by status"
+          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
+          <option value="all">All products</option>
+          <option value="active">Active only</option>
+          <option value="inactive">Inactive only</option>
         </select>
       </div>
 
-      <DataTable columns={columns} data={products} isLoading={isLoading} />
+      <DataTable
+        columns={columns}
+        data={products}
+        isLoading={isLoading}
+        emptyIcon="📦"
+        emptyMessage={search ? 'No products match your search' : 'No products yet'}
+        emptyAction={
+          !search ? (
+            <Link href="/products/new" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+              Add your first product
+            </Link>
+          ) : undefined
+        }
+        selectable
+        bulkActions={(ids, clear) => (
+          <>
+            <button
+              onClick={() => bulkUpdate(ids, { isActive: true }, 'activated', clear)}
+              className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              Activate
+            </button>
+            <button
+              onClick={() => bulkUpdate(ids, { isActive: false }, 'deactivated', clear)}
+              className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              Deactivate
+            </button>
+          </>
+        )}
+      />
       <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
 
       <Modal

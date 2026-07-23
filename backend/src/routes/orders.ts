@@ -9,6 +9,7 @@ import { assessOrderRisk } from '../services/fraud';
 import { sendOrderConfirmation, sendOrderCancellation, sendOrderShipped, sendOrderDelivered } from '../services/notifications';
 import { normalizePhone } from '../utils/phone';
 import { releaseCouponSlot } from '../services/orderLifecycle';
+import { HIGH_RISK_SCORE_THRESHOLD } from '../lib/constants';
 
 const router = Router();
 
@@ -189,27 +190,19 @@ router.post('/', checkoutRateLimiter, async (req: Request, res: Response, next: 
     });
 
     // Assess fraud risk after order is committed (non-blocking)
-    // Resolve the earliest product view time for rapid-checkout detection
-    const firstView = await prisma.productView.findFirst({
-      where: { productId: { in: data.items.map((i) => i.productId) } },
-      orderBy: { createdAt: 'asc' },
-      select: { createdAt: true },
-    });
-
     assessOrderRisk({
       customerPhone: data.customerPhone,
       orderTotal: order.total,
       couponCode: data.couponCode,
       ipAddress: ipAddress || undefined,
       userAgent: userAgent || undefined,
-      firstViewedAt: firstView?.createdAt,
     }).then(async ({ riskScore, flags }) => {
       if (riskScore > 0) {
         await prisma.order.update({
           where: { id: order.id },
           data: { riskScore, riskFlags: JSON.stringify(flags) },
         });
-        if (riskScore >= 30) {
+        if (riskScore >= HIGH_RISK_SCORE_THRESHOLD) {
           logger.warn('High-risk order detected', { orderNumber: order.orderNumber, riskScore, flags });
           dbLog('warn', 'FRAUD', 'fraud.flagged', {
             orderId: order.id,

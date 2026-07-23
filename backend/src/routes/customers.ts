@@ -11,7 +11,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
-import { PAID_ORDER_STATUSES } from '../lib/constants';
+import { PAID_ORDER_STATUSES, HIGH_RISK_SCORE_THRESHOLD } from '../lib/constants';
 import { normalizePhone } from '../utils/phone';
 
 const router = Router();
@@ -23,7 +23,7 @@ function deriveSegment(
   lastOrderAt: Date | null,
   maxRiskScore: number
 ): 'vip' | 'returning' | 'inactive' | 'risky' | 'new' {
-  if (maxRiskScore >= 40) return 'risky';
+  if (maxRiskScore >= HIGH_RISK_SCORE_THRESHOLD) return 'risky';
   const daysSinceLast = lastOrderAt
     ? (Date.now() - lastOrderAt.getTime()) / (1000 * 60 * 60 * 24)
     : Infinity;

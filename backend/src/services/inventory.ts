@@ -53,3 +53,40 @@ export async function releaseStock(items: StockItem[]): Promise<void> {
   });
   logger.info('Stock released', { items });
 }
+
+export interface LowStockProduct {
+  id: string;
+  name: string;
+  slug: string;
+  stock: number;
+  reorderLevel: number;
+}
+
+/**
+ * Active products at or below their own reorder level — the single
+ * definition of "low stock" used by the dashboard, metrics, and the
+ * inventory panel. Prisma can't compare two columns in a WHERE, so we
+ * prefetch bounded by the largest reorder level (never a fixed cap that
+ * would silently drop products with a high reorderLevel) and filter.
+ */
+export async function getLowStockProducts(): Promise<LowStockProduct[]> {
+  const maxAgg = await prisma.product.aggregate({
+    where: { isActive: true },
+    _max: { reorderLevel: true },
+  });
+  const maxReorder = maxAgg._max.reorderLevel ?? 0;
+
+  const candidates = await prisma.product.findMany({
+    where: { isActive: true, stock: { lte: maxReorder } },
+    select: { id: true, name: true, slug: true, stock: true, reorderLevel: true },
+  });
+
+  return candidates
+    .filter((p) => p.stock <= p.reorderLevel)
+    .sort((a, b) => a.stock - b.stock);
+}
+
+/** Count of active products at or below their reorder level. */
+export async function countLowStockProducts(): Promise<number> {
+  return (await getLowStockProducts()).length;
+}

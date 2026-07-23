@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { PAID_ORDER_STATUSES } from '../lib/constants';
 import { startOfEatMonth } from '../utils/time';
+import { getLowStockProducts } from './inventory';
 
 export async function getDashboardStats() {
   const now = new Date();
@@ -59,12 +60,8 @@ export async function getDashboardStats() {
       orderBy: { _sum: { total: 'desc' } },
       take: 5,
     }),
-    prisma.product.findMany({
-      where: { stock: { lte: 5 }, isActive: true },
-      select: { id: true, name: true, stock: true, slug: true },
-      orderBy: { stock: 'asc' },
-      take: 10,
-    }),
+    // Low stock = at/below each product's own reorder level (not a flat <=5)
+    getLowStockProducts().then((list) => list.slice(0, 10)),
     prisma.order.findMany({
       take: 10,
       orderBy: { createdAt: 'desc' },

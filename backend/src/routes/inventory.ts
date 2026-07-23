@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, authorize } from '../middleware/auth';
+import { getLowStockProducts } from '../services/inventory';
 
 const router = Router();
 
@@ -11,16 +12,8 @@ router.get('/intelligence', authenticate, authorize('ADMIN'), async (_req: Reque
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
     // --- Reorder alerts: active products at or below their reorder level ---
-    // We can't do a column-to-column comparison in Prisma without raw SQL,
-    // so we fetch all active products with stock <=20 and filter in JS.
-    const candidateProducts = await prisma.product.findMany({
-      where: { isActive: true, stock: { lte: 20 } },
-      select: { id: true, name: true, slug: true, stock: true, reorderLevel: true },
-    });
-    const reorderAlerts = candidateProducts
-      .filter((p) => p.stock <= p.reorderLevel)
-      .sort((a, b) => a.stock - b.stock)
-      .slice(0, 20);
+    const lowStockProducts = await getLowStockProducts();
+    const reorderAlerts = lowStockProducts.slice(0, 20);
 
     // --- Fast movers: highest units sold in last 7 days ---
     // Group only by productId to avoid separate groups when product names changed
@@ -81,11 +74,13 @@ router.get('/intelligence', authenticate, authorize('ADMIN'), async (_req: Reque
     const deadStockValue = deadStock.reduce((sum, p) => sum + p.stock * p.price, 0);
 
     // --- Stock summary ---
-    const [totalProducts, outOfStock, lowStock] = await Promise.all([
+    // lowStock = at/below reorder level but not yet out of stock, so it and
+    // outOfStock partition the "needs attention" set without overlap.
+    const [totalProducts, outOfStock] = await Promise.all([
       prisma.product.count({ where: { isActive: true } }),
       prisma.product.count({ where: { isActive: true, stock: 0 } }),
-      prisma.product.count({ where: { isActive: true, stock: { gt: 0, lte: 5 } } }),
     ]);
+    const lowStock = lowStockProducts.filter((p) => p.stock > 0).length;
 
     res.json({
       success: true,

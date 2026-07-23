@@ -2,11 +2,12 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { authenticate, authorize } from '../middleware/auth';
+import { couponPreviewLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
 // Public: POST /api/coupons/apply — validate a coupon code against an order total
-router.post('/apply', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/apply', couponPreviewLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { code, orderTotal } = z.object({
       code: z.string().min(1),

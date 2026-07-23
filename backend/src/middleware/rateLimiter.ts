@@ -28,6 +28,16 @@ export const customerAuthLimiter = rateLimit({
   message: { success: false, message: 'Too many attempts, please try again later.' },
 });
 
+// Coupon preview is public and reveals whether a code is valid/expired/
+// exhausted — throttle per IP to blunt code enumeration/brute-force.
+export const couponPreviewLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many coupon attempts, please try again later.' },
+});
+
 /**
  * Per-phone checkout rate limiter.
  *

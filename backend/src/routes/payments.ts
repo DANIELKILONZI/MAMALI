@@ -59,12 +59,20 @@ router.post('/initiate', async (req: Request, res: Response, next: NextFunction)
 
     const stkResult = await initiateSTKPush(phoneNumber, order.total, order.orderNumber);
 
+    // Key the upsert on orderId (Payment.orderId is unique — one payment row
+    // per order). Keying on idempotencyKey instead meant a retry with a
+    // different phone produced a new key, so the create path collided with
+    // the existing row's unique orderId and 500'd. Updating by orderId lets
+    // a customer retry with a corrected phone number.
     const payment = await prisma.payment.upsert({
-      where: { idempotencyKey },
+      where: { orderId },
       update: {
         merchantRequestId: stkResult.merchantRequestId,
         checkoutRequestId: stkResult.checkoutRequestId,
+        phoneNumber,
+        amount: order.total,
         status: 'pending',
+        idempotencyKey,
       },
       create: {
         orderId,

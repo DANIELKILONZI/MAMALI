@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { HIGH_RISK_SCORE_THRESHOLD } from '../lib/constants';
 
 export interface FraudAssessment {
   riskScore: number;
@@ -8,7 +9,7 @@ export interface FraudAssessment {
 /**
  * Assess the fraud risk of a new order using velocity checks,
  * payment failure history, order amount thresholds, coupon abuse detection,
- * rapid checkout detection, and IP velocity.
+ * and IP velocity.
  *
  * Risk score: 0–100 (0 = clean, 1–30 = low, 31–60 = medium, 61+ = high)
  */
@@ -18,13 +19,11 @@ export async function assessOrderRisk(params: {
   couponCode?: string;
   ipAddress?: string;
   userAgent?: string;
-  firstViewedAt?: Date;
 }): Promise<FraudAssessment> {
-  const { customerPhone, orderTotal, couponCode, ipAddress, firstViewedAt } = params;
+  const { customerPhone, orderTotal, couponCode, ipAddress } = params;
   const flags: string[] = [];
   let riskScore = 0;
 
-  const tenSecondsAgo = new Date(Date.now() - 10 * 1000);
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -39,12 +38,6 @@ export async function assessOrderRisk(params: {
   } else if (ordersLastHour >= 2) {
     flags.push('ELEVATED_ORDER_VELOCITY');
     riskScore += 15;
-  }
-
-  // --- Rapid checkout: order placed < 10 seconds after first product view ---
-  if (firstViewedAt && firstViewedAt >= tenSecondsAgo) {
-    flags.push('RAPID_CHECKOUT');
-    riskScore += 20;
   }
 
   // --- IP velocity: 5+ orders from same IP in the last hour ---
@@ -119,7 +112,7 @@ export async function assessOrderRisk(params: {
 /**
  * Returns orders with riskScore >= threshold, for the fraud alerts panel.
  */
-export async function getFraudAlerts(threshold = 30, limit = 20) {
+export async function getFraudAlerts(threshold: number = HIGH_RISK_SCORE_THRESHOLD, limit = 20) {
   return prisma.order.findMany({
     where: { riskScore: { gte: threshold } },
     select: {

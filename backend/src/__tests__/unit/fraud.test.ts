@@ -96,29 +96,9 @@ describe('assessOrderRisk — phone velocity', () => {
   });
 });
 
-// ── Rapid checkout ────────────────────────────────────────────────────────────
-
-describe('assessOrderRisk — rapid checkout', () => {
-  beforeEach(() => clearActivity());
-
-  it('adds RAPID_CHECKOUT (+20) when firstViewedAt is within last 10 seconds', async () => {
-    const firstViewedAt = new Date(Date.now() - 5000); // 5 seconds ago
-    const result = await assessOrderRisk({ ...baseParams, firstViewedAt });
-    expect(result.flags).toContain('RAPID_CHECKOUT');
-    expect(result.riskScore).toBeGreaterThanOrEqual(20);
-  });
-
-  it('does NOT add RAPID_CHECKOUT when firstViewedAt is > 10 seconds ago', async () => {
-    const firstViewedAt = new Date(Date.now() - 15000); // 15 seconds ago
-    const result = await assessOrderRisk({ ...baseParams, firstViewedAt });
-    expect(result.flags).not.toContain('RAPID_CHECKOUT');
-  });
-
-  it('does NOT add RAPID_CHECKOUT when firstViewedAt is not provided', async () => {
-    const result = await assessOrderRisk(baseParams);
-    expect(result.flags).not.toContain('RAPID_CHECKOUT');
-  });
-});
+// The RAPID_CHECKOUT rule was removed: it keyed on the earliest ProductView
+// for the product globally (not the buyer), so it only ever fired in a
+// product's first 10 seconds of existence. See business-logic remediation.
 
 // ── IP velocity ───────────────────────────────────────────────────────────────
 
@@ -260,7 +240,6 @@ describe('assessOrderRisk — score capped at 100', () => {
       orderTotal: 60000,  // VERY_HIGH_ORDER_AMOUNT (+20)
       ipAddress: '1.2.3.4',
       couponCode: 'SAVE10',
-      firstViewedAt: new Date(Date.now() - 3000),  // RAPID_CHECKOUT (+20)
     });
 
     expect(result.riskScore).toBeLessThanOrEqual(100);

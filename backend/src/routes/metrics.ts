@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, authorize } from '../middleware/auth';
+import { countLowStockProducts } from '../services/inventory';
 
 const router = Router();
 
@@ -31,28 +32,28 @@ router.get('/', authenticate, authorize('ADMIN'), async (_req: Request, res: Res
     ]);
     const paymentSuccessRate = totalPayments > 0 ? (completedPayments / totalPayments) * 100 : 0;
 
-    // Average API response time from recent SystemLogs
+    // Only requests slower than the threshold are persisted (requestLogger),
+    // so this is the average of SLOW requests, not all traffic — exposed
+    // under an honest name with its sample size rather than mislabeled as
+    // overall average response time.
     const slowLogs = await prisma.systemLog.findMany({
       where: { category: 'API', level: 'warn', createdAt: { gte: oneDayAgo } },
       select: { details: true },
       take: 100,
     });
-    let avgResponseTime: number | null = null;
-    if (slowLogs.length > 0) {
-      const durations = slowLogs
-        .map((l) => {
-          try {
-            const d = JSON.parse(l.details ?? '{}') as { duration?: number };
-            return d.duration ?? null;
-          } catch {
-            return null;
-          }
-        })
-        .filter((d): d is number => d !== null);
-      if (durations.length > 0) {
-        avgResponseTime = durations.reduce((a, b) => a + b, 0) / durations.length;
-      }
-    }
+    const durations = slowLogs
+      .map((l) => {
+        try {
+          const d = JSON.parse(l.details ?? '{}') as { duration?: number };
+          return d.duration ?? null;
+        } catch {
+          return null;
+        }
+      })
+      .filter((d): d is number => d !== null);
+    const avgSlowRequest = durations.length > 0
+      ? durations.reduce((a, b) => a + b, 0) / durations.length
+      : null;
 
     // Order status breakdown
     const allOrders = await prisma.order.groupBy({
@@ -61,15 +62,17 @@ router.get('/', authenticate, authorize('ADMIN'), async (_req: Request, res: Res
     });
     const orderStatusBreakdown = Object.fromEntries(allOrders.map((o) => [o.status, o._count._all]));
 
-    // Low stock count (products with stock <= 5)
-    const lowStockCount = await prisma.product.count({ where: { stock: { lte: 5 }, isActive: true } });
+    // Low stock count = active products at/below their own reorder level
+    const lowStockCount = await countLowStockProducts();
 
     res.json({
       success: true,
       metrics: {
         ordersPerHour,
         paymentSuccessRate: Math.round(paymentSuccessRate * 100) / 100,
-        avgResponseTimeMs: avgResponseTime ? Math.round(avgResponseTime) : null,
+        // Slow requests only (> requestLogger threshold), with sample size
+        avgSlowRequestMs: avgSlowRequest ? Math.round(avgSlowRequest) : null,
+        slowRequestSample: durations.length,
         orderStatusBreakdown,
         lowStockCount,
       },

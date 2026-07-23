@@ -83,11 +83,15 @@ async function confirmOrderPaidFromJob(payment: { id: string; orderId: string })
 
 export async function recheckPendingPayments(): Promise<void> {
   try {
-    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
+    // Look back 2h, not 30m: orders expire at 30m, so a payment confirmed
+    // right around expiry would otherwise fall outside the window and never
+    // be reconciled by automation. A confirmation for an already-cancelled
+    // order now no-ops safely (transitionOrderToPaid guards the status).
+    const lookbackStart = new Date(Date.now() - 2 * 60 * 60 * 1000);
     const pendingPayments = await prisma.payment.findMany({
       where: {
         status: 'pending',
-        createdAt: { gt: thirtyMinsAgo },
+        createdAt: { gt: lookbackStart },
         checkoutRequestId: { not: null },
       },
     });

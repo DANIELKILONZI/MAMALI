@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { adminApi, InventoryIntelligence } from '@/lib/api';
 import AdminLayout from '@/components/layout/AdminLayout';
+import PageHeader from '@/components/ui/PageHeader';
 import { withAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -43,12 +44,10 @@ function InventoryPage() {
 
   return (
     <AdminLayout>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Inventory Intelligence</h2>
-        <p className="text-gray-500 text-sm mt-1">
-          Fast movers, dead stock, and reorder alerts
-        </p>
-      </div>
+      <PageHeader
+        title="Inventory"
+        description="Fast movers, dead stock, and what to reorder."
+      />
 
       <div className="space-y-6">
         {/* Summary stats */}

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { adminApi, ContentPage } from '@/lib/api';
 import AdminLayout from '@/components/layout/AdminLayout';
+import PageHeader from '@/components/ui/PageHeader';
 import { withAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -21,12 +22,13 @@ function ContentListPage() {
 
   return (
     <AdminLayout>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Content Pages</h2>
-      </div>
+      <PageHeader
+        title="Pages"
+        description="About, Contact, FAQ and policy pages shown on your storefront."
+      />
 
       {isLoading ? (
-        <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow">Loading...</div>
+        <div className="h-64 animate-pulse rounded-xl border border-gray-200 bg-white" />
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="w-full text-sm">

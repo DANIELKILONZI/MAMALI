@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { adminApi, Coupon } from '@/lib/api';
 import AdminLayout from '@/components/layout/AdminLayout';
+import PageHeader from '@/components/ui/PageHeader';
 import { withAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -45,21 +46,25 @@ function CouponsPage() {
 
   return (
     <AdminLayout>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Coupons</h2>
-          <p className="text-gray-500 text-sm mt-1">Manage discount codes for your store</p>
-        </div>
-        <Link
-          href="/coupons/new"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-        >
-          + New Coupon
-        </Link>
-      </div>
+      <PageHeader
+        title="Coupons"
+        description="Discount codes customers can apply at checkout."
+        actions={
+          <Link
+            href="/coupons/new"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            + New coupon
+          </Link>
+        }
+      />
 
       {isLoading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <div className="space-y-3">
+          {['a', 'b', 'c'].map((k) => (
+            <div key={k} className="h-20 animate-pulse rounded-xl border border-gray-200 bg-white" />
+          ))}
+        </div>
       ) : coupons.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center text-gray-400">
           <p className="text-4xl mb-3">🎟️</p>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { adminApi, Category } from '@/lib/api';
 import AdminLayout from '@/components/layout/AdminLayout';
+import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
 import { withAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
@@ -104,18 +105,25 @@ function CategoriesPage() {
 
   return (
     <AdminLayout>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Categories</h2>
-        <Link
-          href="/categories/new"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-        >
-          + Add Category
-        </Link>
-      </div>
+      <PageHeader
+        title="Categories"
+        description="Organise your catalogue. Categories appear in storefront navigation."
+        actions={
+          <Link
+            href="/categories/new"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            + Add category
+          </Link>
+        }
+      />
 
       {isLoading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <div className="space-y-3">
+          {['a', 'b', 'c'].map((k) => (
+            <div key={k} className="h-16 animate-pulse rounded-xl border border-gray-200 bg-white" />
+          ))}
+        </div>
       ) : (
         <div className="space-y-3">
           {categories.map((cat) => (

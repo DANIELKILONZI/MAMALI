@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { adminApi, Advertisement } from '@/lib/api';
 import AdminLayout from '@/components/layout/AdminLayout';
+import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
 import { withAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
@@ -47,18 +48,21 @@ function AdvertisementsPage() {
 
   return (
     <AdminLayout>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Advertisements</h2>
-        <Link
-          href="/advertisements/new"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-        >
-          + New Ad
-        </Link>
-      </div>
+      <PageHeader
+        title="Advertisements"
+        description="Banners and promotions on your storefront. Only you can manage these."
+        actions={
+          <Link
+            href="/advertisements/new"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            + New ad
+          </Link>
+        }
+      />
 
       {isLoading ? (
-        <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow">Loading...</div>
+        <div className="h-64 animate-pulse rounded-xl border border-gray-200 bg-white" />
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="w-full text-sm">

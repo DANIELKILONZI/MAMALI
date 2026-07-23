@@ -9,6 +9,7 @@ import {
   CustomerSegment,
 } from '@/lib/api';
 import AdminLayout from '@/components/layout/AdminLayout';
+import PageHeader from '@/components/ui/PageHeader';
 import { withAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -254,14 +255,10 @@ function CustomersPage() {
 
   return (
     <AdminLayout>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Customers</h2>
-          <p className="text-gray-500 text-sm mt-1">
-            {data ? `${data.pagination.total} customers` : 'Loading…'}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Customers"
+        description={data ? `${data.pagination.total} customers who have ordered from you` : 'Loading…'}
+      />
 
       {/* Segment Tabs */}
       <div className="flex flex-wrap gap-2 mb-4">

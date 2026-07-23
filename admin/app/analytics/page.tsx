@@ -11,6 +11,7 @@ import {
   CustomerAnalytics,
 } from '@/lib/api';
 import AdminLayout from '@/components/layout/AdminLayout';
+import PageHeader from '@/components/ui/PageHeader';
 import { withAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -80,10 +81,10 @@ function AnalyticsPage() {
 
   return (
     <AdminLayout>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Analytics</h2>
-        <p className="text-gray-500 text-sm mt-1">Business intelligence — last 30 days</p>
-      </div>
+      <PageHeader
+        title="Analytics"
+        description="How the business is performing — last 30 days."
+      />
 
       <div className="space-y-6">
 

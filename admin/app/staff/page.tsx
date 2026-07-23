@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { adminApi, StaffUser } from '@/lib/api';
 import AdminLayout from '@/components/layout/AdminLayout';
+import PageHeader from '@/components/ui/PageHeader';
 import Modal from '@/components/ui/Modal';
 import DataTable from '@/components/ui/DataTable';
 import { withAuth } from '@/context/AuthContext';
@@ -86,17 +87,31 @@ function StaffPage() {
 
   return (
     <AdminLayout>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Staff Management</h2>
-        <Link
-          href="/staff/new"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-        >
-          + Add Staff
-        </Link>
-      </div>
+      <PageHeader
+        title="Staff"
+        description="Your employees and what each of them can access."
+        actions={
+          <Link
+            href="/staff/new"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            + Add staff
+          </Link>
+        }
+      />
 
-      <DataTable columns={columns} data={staff} isLoading={isLoading} />
+      <DataTable
+        columns={columns}
+        data={staff}
+        isLoading={isLoading}
+        emptyIcon="🧑‍💼"
+        emptyMessage="No staff yet"
+        emptyAction={
+          <Link href="/staff/new" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+            Add your first employee
+          </Link>
+        }
+      />
 
       <Modal
         isOpen={!!deleteId}

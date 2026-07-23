@@ -109,7 +109,9 @@ router.post('/', checkoutRateLimiter, async (req: Request, res: Response, next: 
 
       const orderItems = data.items.map((item) => {
         const product = products.find((p) => p.id === item.productId)!;
-        const price = product.price - (product.price * product.discount) / 100;
+        // Money is whole shillings (KES): M-Pesa transacts whole shillings and
+        // this eliminates floating-point drift in stored amounts.
+        const price = Math.round(product.price - (product.price * product.discount) / 100);
         return { productId: item.productId, name: product.name, price, quantity: item.quantity, total: price * item.quantity };
       });
 
@@ -152,7 +154,7 @@ router.post('/', checkoutRateLimiter, async (req: Request, res: Response, next: 
         discountAmount = coupon.discountType === 'percent'
           ? Math.min(subtotal, (subtotal * coupon.discountValue) / 100)
           : Math.min(subtotal, coupon.discountValue);
-        discountAmount = Math.round(discountAmount * 100) / 100;
+        discountAmount = Math.round(discountAmount); // whole shillings
         resolvedCouponCode = coupon.code;
       }
 

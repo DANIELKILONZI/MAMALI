@@ -128,9 +128,23 @@ router.post('/callback', async (req: Request, res: Response, next: NextFunction)
     }
 
     let mpesaReceiptNumber: string | undefined;
+    let paidAmount: number | undefined;
     if (ResultCode === 0 && CallbackMetadata?.Item) {
       const items = CallbackMetadata.Item as Array<{ Name: string; Value: unknown }>;
       mpesaReceiptNumber = items.find((i) => i.Name === 'MpesaReceiptNumber')?.Value as string;
+      const amt = items.find((i) => i.Name === 'Amount')?.Value;
+      if (typeof amt === 'number') paidAmount = amt;
+    }
+
+    // Flag if the customer paid a different amount than we recorded — the
+    // funds are captured either way, but a mismatch needs manual review.
+    if (paidAmount !== undefined && Math.round(paidAmount) !== Math.round(payment.amount)) {
+      await dbLog('warn', 'PAYMENT', 'M-Pesa paid amount does not match recorded amount', {
+        orderId: payment.orderId,
+        recordedAmount: payment.amount,
+        paidAmount,
+        mpesaReceiptNumber,
+      });
     }
 
     const status = ResultCode === 0 ? 'completed' : 'failed';

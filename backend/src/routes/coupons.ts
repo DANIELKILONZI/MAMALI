@@ -45,7 +45,7 @@ router.post('/apply', couponPreviewLimiter, async (req: Request, res: Response, 
     res.json({
       success: true,
       coupon: { id: coupon.id, code: coupon.code, discountType: coupon.discountType, discountValue: coupon.discountValue },
-      discountAmount: Math.round(discountAmount * 100) / 100,
+      discountAmount: Math.round(discountAmount), // whole shillings
     });
   } catch (err) {
     next(err);

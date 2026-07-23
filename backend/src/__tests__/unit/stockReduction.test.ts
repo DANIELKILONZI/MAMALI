@@ -37,7 +37,7 @@ interface OrderItem {
 
 /** Effective price after product-level percentage discount. */
 function effectivePrice(product: Pick<ProductInput, 'price' | 'discount'>): number {
-  return product.price - (product.price * product.discount) / 100;
+  return Math.round(product.price - (product.price * product.discount) / 100); // whole shillings
 }
 
 /** Build order items array from product catalogue + requested items. */

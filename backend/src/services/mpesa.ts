@@ -63,7 +63,9 @@ export async function initiateSTKPush(
       Password: password,
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
-      Amount: Math.ceil(amount),
+      // Order totals are already whole shillings; guard defensively anyway so
+      // the charged amount always equals the recorded Payment.amount.
+      Amount: Math.round(amount),
       PartyA: formattedPhone,
       PartyB: env.MPESA_SHORTCODE,
       PhoneNumber: formattedPhone,

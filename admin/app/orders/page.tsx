@@ -49,7 +49,7 @@ function OrdersPage() {
   };
 
   const formatCurrency = (v: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
+    'KSh ' + new Intl.NumberFormat('en-KE', { maximumFractionDigits: 0 }).format(v);
 
   return (
     <AdminLayout>

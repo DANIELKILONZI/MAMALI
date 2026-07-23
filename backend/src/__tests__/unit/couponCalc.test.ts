@@ -23,7 +23,7 @@ function calculateDiscount(
   } else {
     discountAmount = Math.min(orderTotal, coupon.discountValue);
   }
-  return Math.round(discountAmount * 100) / 100;
+  return Math.round(discountAmount); // whole shillings (KES)
 }
 
 // ── Coupon validation helpers ─────────────────────────────────────────────────
@@ -66,10 +66,10 @@ describe('Coupon — percent discount', () => {
     expect(discount).toBe(500);
   });
 
-  it('rounds to 2 decimal places', () => {
-    // 33% of 100 = 33.333... → rounds to 33.33
-    const discount = calculateDiscount({ discountType: 'percent', discountValue: 33.33 }, 100);
-    expect(discount).toBe(33.33);
+  it('rounds to whole shillings', () => {
+    // 33.33% of 1000 = 333.3 → rounds to 333 KES
+    const discount = calculateDiscount({ discountType: 'percent', discountValue: 33.33 }, 1000);
+    expect(discount).toBe(333);
   });
 
   it('cannot exceed order total (100% coupon on any order)', () => {

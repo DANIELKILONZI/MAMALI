@@ -376,10 +376,10 @@ export const customerAuth = {
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
-/** Returns the effective selling price after discount */
+/** Returns the effective selling price after discount, in whole shillings */
 export function effectivePrice(product: Pick<Product, 'price' | 'discount'>): number {
   if (!product.discount) return product.price;
-  return product.price * (1 - product.discount / 100);
+  return Math.round(product.price * (1 - product.discount / 100));
 }
 
 /** Returns stock status label */

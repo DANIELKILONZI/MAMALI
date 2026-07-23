@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { defaultContentPages } from './seedContent';
 
 const prisma = new PrismaClient();
 
@@ -48,15 +49,7 @@ async function main() {
   // Seed default content pages
   const pagesCount = await prisma.contentPage.count();
   if (pagesCount === 0) {
-    await prisma.contentPage.createMany({
-      data: [
-        { slug: 'about', title: 'About Us', content: '<p>About MAMALI</p>', isActive: true },
-        { slug: 'contact', title: 'Contact Us', content: '<p>Contact information</p>', isActive: true },
-        { slug: 'faq', title: 'FAQ', content: '<p>Frequently asked questions</p>', isActive: true },
-        { slug: 'privacy', title: 'Privacy Policy', content: '<p>Privacy policy</p>', isActive: true },
-        { slug: 'terms', title: 'Terms & Conditions', content: '<p>Terms and conditions</p>', isActive: true },
-      ],
-    });
+    await prisma.contentPage.createMany({ data: defaultContentPages });
     console.log('Default content pages seeded.');
   }
 }

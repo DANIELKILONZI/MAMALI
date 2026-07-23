@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { authenticate, requireOwner } from '../middleware/auth';
+import { authenticate, requireOwner, requirePermission } from '../middleware/auth';
 import {
   DELEGATABLE_PERMISSIONS,
   sanitizeGrant,
@@ -54,6 +54,24 @@ router.get('/', authenticate, requireOwner, async (_req: Request, res: Response,
   try {
     const rows = await prisma.user.findMany({ select: staffSelect, orderBy: { createdAt: 'desc' } });
     const staff = rows.map((s) => ({ ...s, permissions: effectivePermissions(s) }));
+    res.json({ success: true, staff });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Minimal active-staff list for assigning orders. Gated by orders.manage
+ * (not owner) so an employee who manages orders can assign them without
+ * being granted full staff-management access. Declared before '/:id'.
+ */
+router.get('/assignable', authenticate, requirePermission('orders.manage'), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const staff = await prisma.user.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, role: true },
+      orderBy: { name: 'asc' },
+    });
     res.json({ success: true, staff });
   } catch (err) {
     next(err);

@@ -292,10 +292,12 @@ router.get('/list', authenticate, requirePermission('orders.manage'), async (req
   }
 });
 
-router.get('/:orderNumber', async (req: Request, res: Response, next: NextFunction) => {
+// Accepts an order number (customer tracking links) or an id (admin detail).
+router.get('/:orderNumberOrId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const order = await prisma.order.findUnique({
-      where: { orderNumber: String(req.params.orderNumber) },
+    const key = String(req.params.orderNumberOrId);
+    const order = await prisma.order.findFirst({
+      where: { OR: [{ orderNumber: key }, { id: key }] },
       include: {
         items: { include: { product: { select: { id: true, name: true, slug: true, images: true } } } },
         payment: true,

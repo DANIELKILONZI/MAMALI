@@ -28,10 +28,18 @@ function OrderDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const reload = () => {
-    Promise.all([adminApi.orders.get(id), adminApi.staff.list()])
-      .then(([o, s]) => { setOrder(o); setStaff(s); })
+    // The order must load even if the assignable-staff call fails, so they
+    // are fetched independently rather than in an all-or-nothing Promise.all.
+    adminApi.orders
+      .get(id)
+      .then(setOrder)
       .catch(() => toast.error('Failed to load order'))
       .finally(() => setIsLoading(false));
+
+    adminApi.staff
+      .assignable()
+      .then((s) => setStaff(s as unknown as StaffUser[]))
+      .catch(() => setStaff([])); // assignment UI simply hides if unavailable
   };
 
   useEffect(() => { reload(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps

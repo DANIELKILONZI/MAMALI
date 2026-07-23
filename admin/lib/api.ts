@@ -112,6 +112,11 @@ export const adminApi = {
   staff: {
     list: () =>
       request<{ success: boolean; staff: StaffUser[] }>('/api/admin/staff').then((r) => r.staff),
+    /** Minimal active-staff list for order assignment (needs orders.manage, not owner). */
+    assignable: () =>
+      request<{ success: boolean; staff: { id: string; name: string; role: string }[] }>(
+        '/api/admin/staff/assignable'
+      ).then((r) => r.staff),
     get: (id: string) =>
       request<{ success: boolean; staff: StaffUser }>(`/api/admin/staff/${id}`).then((r) => r.staff),
     create: (data: Partial<StaffUser> & { password: string }) =>
@@ -161,18 +166,31 @@ export const adminApi = {
       }).then((r) => r.page),
   },
   homepage: {
-    list: () => request<HomepageSection[]>('/api/admin/homepage'),
-    get: (id: string) => request<HomepageSection>(`/api/admin/homepage/${id}`),
+    list: () =>
+      request<{ success: boolean; sections: HomepageSection[] }>('/api/admin/homepage').then(
+        (r) => r.sections
+      ),
+    get: (id: string) =>
+      request<{ success: boolean; section: HomepageSection }>(`/api/admin/homepage/${id}`).then(
+        (r) => r.section
+      ),
+    create: (data: Partial<HomepageSection>) =>
+      request<{ success: boolean; section: HomepageSection }>('/api/admin/homepage', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((r) => r.section),
     update: (id: string, data: Partial<HomepageSection>) =>
-      request<HomepageSection>(`/api/admin/homepage/${id}`, {
+      request<{ success: boolean; section: HomepageSection }>(`/api/admin/homepage/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
-      }),
+      }).then((r) => r.section),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/api/admin/homepage/${id}`, { method: 'DELETE' }),
     reorder: (ids: string[]) =>
-      request<void>('/api/admin/homepage/reorder', {
-        method: 'POST',
+      request<{ success: boolean; sections: HomepageSection[] }>('/api/admin/homepage/reorder', {
+        method: 'PUT',
         body: JSON.stringify({ ids }),
-      }),
+      }).then((r) => r.sections),
   },
 
   settings: {

@@ -75,10 +75,12 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => {
+// Accepts a slug (storefront, SEO URLs) or an id (admin edit screens).
+router.get('/:slugOrId', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const product = await prisma.product.findUnique({
-      where: { slug: String(req.params.slug) },
+    const key = String(req.params.slugOrId);
+    const product = await prisma.product.findFirst({
+      where: { OR: [{ slug: key }, { id: key }] },
       include: { category: { select: { id: true, name: true, slug: true } } },
     });
     if (!product) {

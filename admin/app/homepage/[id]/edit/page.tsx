@@ -127,4 +127,4 @@ function EditHomepageSectionPage() {
   );
 }
 
-export default withAuth(EditHomepageSectionPage);
+export default withAuth(EditHomepageSectionPage, { permission: 'content.manage' });

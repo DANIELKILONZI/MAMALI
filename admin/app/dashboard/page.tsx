@@ -245,4 +245,4 @@ function StatCard({
   );
 }
 
-export default withAuth(DashboardPage);
+export default withAuth(DashboardPage, { permission: 'analytics.view' });

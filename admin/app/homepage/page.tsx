@@ -130,4 +130,4 @@ function HomepagePage() {
   );
 }
 
-export default withAuth(HomepagePage);
+export default withAuth(HomepagePage, { permission: 'content.manage' });

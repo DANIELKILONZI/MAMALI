@@ -4,10 +4,11 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { z } from 'zod';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requireOwner } from '../middleware/auth';
 import { authLimiter } from '../middleware/rateLimiter';
 import { env } from '../config/env';
 import { dbLog } from '../utils/logger';
+import { DELEGATABLE_PERMISSIONS, parsePermissions, isOwnerRole } from '../lib/permissions';
 
 const router = Router();
 
@@ -104,11 +105,14 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
       res.cookie('mamali_refresh_token', refreshTokenRaw, { httpOnly: true, sameSite: 'lax', secure, path: '/' });
     }
 
+    const permissions = isOwnerRole(user.role)
+      ? [...DELEGATABLE_PERMISSIONS]
+      : parsePermissions(user.permissions);
     res.json({
       success: true,
       token,
       refreshToken: refreshTokenRaw,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, permissions },
     });
   } catch (err) {
     next(err);
@@ -170,7 +174,7 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
 router.post(
   '/register',
   authenticate,
-  authorize('ADMIN'),
+  requireOwner,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = registerSchema.parse(req.body);
@@ -195,13 +199,18 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
-      select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
+      select: { id: true, name: true, email: true, role: true, permissions: true, isActive: true, createdAt: true },
     });
     if (!user) {
       res.status(404).json({ success: false, message: 'User not found' });
       return;
     }
-    res.json({ success: true, user });
+    // Owners implicitly hold every permission; expose the effective set so
+    // the admin UI can gate navigation and controls.
+    const permissions = isOwnerRole(user.role)
+      ? [...DELEGATABLE_PERMISSIONS]
+      : parsePermissions(user.permissions);
+    res.json({ success: true, user: { ...user, permissions } });
   } catch (err) {
     next(err);
   }

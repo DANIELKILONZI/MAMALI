@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requireOwner } from '../middleware/auth';
 
 const router = Router();
 
@@ -44,7 +44,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 // Admin routes
 const adminRouter = Router();
 
-adminRouter.get('/', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+adminRouter.get('/', authenticate, requireOwner, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const ads = await prisma.advertisement.findMany({ orderBy: { sortOrder: 'asc' } });
     res.json({ success: true, advertisements: ads });
@@ -53,7 +53,7 @@ adminRouter.get('/', authenticate, authorize('ADMIN'), async (req: Request, res:
   }
 });
 
-adminRouter.get('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+adminRouter.get('/:id', authenticate, requireOwner, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const ad = await prisma.advertisement.findUnique({ where: { id: String(req.params.id) } });
     if (!ad) {
@@ -66,7 +66,7 @@ adminRouter.get('/:id', authenticate, authorize('ADMIN'), async (req: Request, r
   }
 });
 
-adminRouter.post('/', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+adminRouter.post('/', authenticate, requireOwner, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = adSchema.parse(req.body);
     const ad = await prisma.advertisement.create({ data: {
@@ -80,7 +80,7 @@ adminRouter.post('/', authenticate, authorize('ADMIN'), async (req: Request, res
   }
 });
 
-adminRouter.put('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+adminRouter.put('/:id', authenticate, requireOwner, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = adSchema.partial().parse(req.body);
     const ad = await prisma.advertisement.update({
@@ -97,7 +97,7 @@ adminRouter.put('/:id', authenticate, authorize('ADMIN'), async (req: Request, r
   }
 });
 
-adminRouter.delete('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+adminRouter.delete('/:id', authenticate, requireOwner, async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.advertisement.delete({ where: { id: String(req.params.id) } });
     res.json({ success: true, message: 'Advertisement deleted' });

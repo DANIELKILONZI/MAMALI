@@ -110,12 +110,20 @@ export const adminApi = {
       }).then((r) => r.order),
   },
   staff: {
-    list: () => request<StaffUser[]>('/api/admin/staff'),
-    get: (id: string) => request<StaffUser>(`/api/admin/staff/${id}`),
+    list: () =>
+      request<{ success: boolean; staff: StaffUser[] }>('/api/admin/staff').then((r) => r.staff),
+    get: (id: string) =>
+      request<{ success: boolean; staff: StaffUser }>(`/api/admin/staff/${id}`).then((r) => r.staff),
     create: (data: Partial<StaffUser> & { password: string }) =>
-      request<StaffUser>('/api/admin/staff', { method: 'POST', body: JSON.stringify(data) }),
+      request<{ success: boolean; user: StaffUser }>('/api/admin/staff', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }).then((r) => r.user),
     update: (id: string, data: Partial<StaffUser>) =>
-      request<StaffUser>(`/api/admin/staff/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      request<{ success: boolean; user: StaffUser }>(`/api/admin/staff/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }).then((r) => r.user),
     delete: (id: string) =>
       request<void>(`/api/admin/staff/${id}`, { method: 'DELETE' }),
   },
@@ -259,7 +267,8 @@ export interface AdminUser {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'staff';
+  role: string;
+  permissions?: string[];
 }
 
 export interface DashboardData {
@@ -352,7 +361,8 @@ export interface StaffUser {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'staff';
+  role: 'OWNER' | 'STAFF';
+  permissions: string[];
   isActive: boolean;
   password?: string;
 }

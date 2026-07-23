@@ -6,7 +6,11 @@ import { adminApi } from '@/lib/api';
 import AdminLayout from '@/components/layout/AdminLayout';
 import FormField, { inputClass, selectClass } from '@/components/ui/FormField';
 import { withAuth } from '@/context/AuthContext';
+import { PermissionPicker } from '../../new/page';
+import { DELEGATABLE_PERMISSIONS, type Permission } from '@/lib/permissions';
 import toast from 'react-hot-toast';
+
+const DELEGATABLE_KEYS = new Set<Permission>(DELEGATABLE_PERMISSIONS.map((p) => p.key));
 
 function EditStaffPage() {
   const router = useRouter();
@@ -16,9 +20,19 @@ function EditStaffPage() {
   const [form, setForm] = useState({
     name: '',
     email: '',
-    role: 'staff' as 'admin' | 'staff',
+    role: 'STAFF' as 'OWNER' | 'STAFF',
     isActive: true,
   });
+  const [permissions, setPermissions] = useState<Set<Permission>>(new Set());
+
+  const togglePermission = (key: Permission) => {
+    setPermissions((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   useEffect(() => {
     adminApi.staff
@@ -27,9 +41,11 @@ function EditStaffPage() {
         setForm({
           name: s.name ?? '',
           email: s.email ?? '',
-          role: s.role ?? 'staff',
+          role: (s.role as 'OWNER' | 'STAFF') ?? 'STAFF',
           isActive: s.isActive ?? true,
         });
+        // Keep only delegatable permissions in the picker (owners report all).
+        setPermissions(new Set((s.permissions ?? []).filter((p): p is Permission => DELEGATABLE_KEYS.has(p as Permission))));
       })
       .catch(() => toast.error('Failed to load staff member'))
       .finally(() => setIsLoading(false));
@@ -39,7 +55,10 @@ function EditStaffPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await adminApi.staff.update(id, form);
+      await adminApi.staff.update(id, {
+        ...form,
+        permissions: form.role === 'OWNER' ? [] : Array.from(permissions),
+      });
       toast.success('Staff member updated!');
       router.push('/staff');
     } catch (err) {
@@ -68,58 +87,45 @@ function EditStaffPage() {
 
       <form onSubmit={handleSubmit} className="max-w-lg bg-white rounded-lg shadow p-6 space-y-4">
         <FormField label="Name" required>
-          <input
-            className={inputClass}
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
-          />
+          <input className={inputClass} value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })} required />
         </FormField>
 
         <FormField label="Email" required>
-          <input
-            type="email"
-            className={inputClass}
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            required
-          />
+          <input type="email" className={inputClass} value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })} required />
         </FormField>
 
         <FormField label="Role">
-          <select
-            className={selectClass}
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value as 'admin' | 'staff' })}
-          >
-            <option value="staff">Staff</option>
-            <option value="admin">Admin</option>
+          <select className={selectClass} value={form.role}
+            onChange={(e) => setForm({ ...form, role: e.target.value as 'OWNER' | 'STAFF' })}>
+            <option value="STAFF">Staff (employee — you choose their access below)</option>
+            <option value="OWNER">Owner (full control of everything)</option>
           </select>
         </FormField>
 
+        {form.role === 'STAFF' && (
+          <PermissionPicker selected={permissions} onToggle={togglePermission} />
+        )}
+        {form.role === 'OWNER' && (
+          <p className="rounded-md bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+            Owners have full control of the business, including advertisements, staff, and settings.
+          </p>
+        )}
+
         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={form.isActive}
-            onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-            className="rounded"
-          />
+          <input type="checkbox" checked={form.isActive}
+            onChange={(e) => setForm({ ...form, isActive: e.target.checked })} className="rounded" />
           Active
         </label>
 
         <div className="flex gap-3 pt-2">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg text-sm font-medium"
-          >
+          <button type="submit" disabled={isSubmitting}
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg text-sm font-medium">
             {isSubmitting ? 'Saving...' : 'Save Changes'}
           </button>
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium"
-          >
+          <button type="button" onClick={() => router.back()}
+            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium">
             Cancel
           </button>
         </div>
@@ -128,4 +134,4 @@ function EditStaffPage() {
   );
 }
 
-export default withAuth(EditStaffPage, true);
+export default withAuth(EditStaffPage, { ownerOnly: true });

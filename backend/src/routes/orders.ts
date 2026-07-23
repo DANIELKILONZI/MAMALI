@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requirePermission } from '../middleware/auth';
 import { checkoutRateLimiter } from '../middleware/rateLimiter';
 import { logger, dbLog } from '../utils/logger';
 import { assessOrderRisk } from '../services/fraud';
@@ -248,7 +248,7 @@ router.post('/', checkoutRateLimiter, async (req: Request, res: Response, next: 
   }
 });
 
-router.get('/list', authenticate, authorize('ADMIN', 'STAFF'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/list', authenticate, requirePermission('orders.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { status, page: pageParam = '1', limit: limitParam = '20', search } = req.query;
     const page = Math.max(1, parseInt(pageParam as string, 10) || 1);
@@ -309,7 +309,7 @@ router.get('/:orderNumber', async (req: Request, res: Response, next: NextFuncti
   }
 });
 
-router.put('/:id/status', authenticate, authorize('ADMIN', 'STAFF'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id/status', authenticate, requirePermission('orders.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { status } = z.object({ status: z.string() }).parse(req.body);
     const order = await prisma.order.findUnique({ where: { id: String(req.params.id) } });
@@ -410,7 +410,7 @@ router.put('/:id/status', authenticate, authorize('ADMIN', 'STAFF'), async (req:
   }
 });
 
-router.put('/:id/assign', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id/assign', authenticate, requirePermission('orders.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { staffId } = z.object({ staffId: z.string() }).parse(req.body);
     const staff = await prisma.user.findUnique({ where: { id: staffId } });
@@ -438,7 +438,7 @@ router.put('/:id/assign', authenticate, authorize('ADMIN'), async (req: Request,
   }
 });
 
-router.get('/:id/activity', authenticate, authorize('ADMIN', 'STAFF'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id/activity', authenticate, requirePermission('orders.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const logs = await prisma.activityLog.findMany({
       where: { orderId: String(req.params.id) },

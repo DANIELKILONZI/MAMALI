@@ -45,10 +45,10 @@ function StaffPage() {
       render: (s: StaffUser) => (
         <span
           className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-            s.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+            s.role === 'OWNER' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
           }`}
         >
-          {s.role}
+          {s.role === 'OWNER' ? 'Owner' : 'Staff'}
         </span>
       ),
     },

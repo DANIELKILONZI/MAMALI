@@ -5,30 +5,48 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { adminApi } from '@/lib/api';
+import type { Permission } from '@/lib/permissions';
 
-const navItems = [
-  { href: '/dashboard',      label: 'Dashboard',      icon: '📊' },
-  { href: '/alerts',         label: 'Alerts',          icon: '🚨' },
-  { href: '/analytics',      label: 'Analytics',       icon: '📈' },
-  { href: '/products',       label: 'Products',        icon: '📦' },
-  { href: '/categories',     label: 'Categories',      icon: '🗂️' },
-  { href: '/orders',         label: 'Orders',          icon: '🛒' },
-  { href: '/customers',      label: 'Customers',       icon: '👥' },
-  { href: '/inventory',      label: 'Inventory',       icon: '🏭' },
-  { href: '/coupons',        label: 'Coupons',         icon: '🎟️' },
-  { href: '/advertisements', label: 'Advertisements',  icon: '📢' },
-  { href: '/notifications',  label: 'Notifications',   icon: '🔔' },
-  { href: '/content',        label: 'Content',         icon: '📄' },
-  { href: '/homepage',       label: 'Homepage',        icon: '🏠' },
-  { href: '/settings',       label: 'Settings',        icon: '⚙️' },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: string;
+  permission?: Permission; // delegatable — visible when granted
+  ownerOnly?: boolean;     // visible only to the owner
+}
+
+const navItems: NavItem[] = [
+  { href: '/dashboard',      label: 'Dashboard',      icon: '📊', permission: 'analytics.view' },
+  { href: '/alerts',         label: 'Alerts',          icon: '🚨', permission: 'analytics.view' },
+  { href: '/analytics',      label: 'Analytics',       icon: '📈', permission: 'analytics.view' },
+  { href: '/products',       label: 'Products',        icon: '📦', permission: 'products.manage' },
+  { href: '/categories',     label: 'Categories',      icon: '🗂️', permission: 'categories.manage' },
+  { href: '/orders',         label: 'Orders',          icon: '🛒', permission: 'orders.manage' },
+  { href: '/customers',      label: 'Customers',       icon: '👥', permission: 'customers.manage' },
+  { href: '/inventory',      label: 'Inventory',       icon: '🏭', permission: 'inventory.manage' },
+  { href: '/coupons',        label: 'Coupons',         icon: '🎟️', permission: 'coupons.manage' },
+  { href: '/notifications',  label: 'Notifications',   icon: '🔔', permission: 'notifications.manage' },
+  { href: '/content',        label: 'Content',         icon: '📄', permission: 'content.manage' },
+  { href: '/homepage',       label: 'Homepage',        icon: '🏠', permission: 'content.manage' },
+  // Owner-exclusive
+  { href: '/advertisements', label: 'Advertisements',  icon: '📢', ownerOnly: true },
+  { href: '/settings',       label: 'Settings',        icon: '⚙️', ownerOnly: true },
+  { href: '/staff',          label: 'Staff',           icon: '🧑‍💼', ownerOnly: true },
 ];
 
 const ALERT_POLL_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isOwner, can } = useAuth();
   const [alertCount, setAlertCount] = useState<{ critical: number; total: number } | null>(null);
+
+  // Show only sections this user can reach.
+  const visibleNav = navItems.filter((item) => {
+    if (item.ownerOnly) return isOwner;
+    if (item.permission) return can(item.permission);
+    return true; // Dashboard — universal
+  });
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + '/');
@@ -64,7 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => (
+          {visibleNav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -90,20 +108,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               )}
             </Link>
           ))}
-
-          {isAdmin && (
-            <Link
-              href="/staff"
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive('/staff')
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-              }`}
-            >
-              <span>👥</span>
-              Staff
-            </Link>
-          )}
         </nav>
 
         <div className="p-4 border-t border-slate-700">

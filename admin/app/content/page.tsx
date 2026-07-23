@@ -79,4 +79,4 @@ function ContentListPage() {
   );
 }
 
-export default withAuth(ContentListPage);
+export default withAuth(ContentListPage, { permission: 'content.manage' });

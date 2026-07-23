@@ -228,4 +228,4 @@ function EditProductPage() {
   );
 }
 
-export default withAuth(EditProductPage);
+export default withAuth(EditProductPage, { permission: 'products.manage' });

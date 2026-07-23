@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requirePermission } from '../middleware/auth';
 import { getFraudAlerts } from '../services/fraud';
 import { PAID_ORDER_STATUSES } from '../lib/constants';
 import { eatDayKey } from '../utils/time';
@@ -8,7 +8,7 @@ import { eatDayKey } from '../utils/time';
 const router = Router();
 
 // GET /api/admin/analytics/revenue  — daily revenue for last 30 days
-router.get('/revenue', authenticate, authorize('ADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/revenue', authenticate, requirePermission('analytics.view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
@@ -53,7 +53,7 @@ router.get('/revenue', authenticate, authorize('ADMIN'), async (_req: Request, r
 });
 
 // GET /api/admin/analytics/products — per-product performance
-router.get('/products', authenticate, authorize('ADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/products', authenticate, requirePermission('analytics.view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
@@ -131,7 +131,7 @@ router.get('/products', authenticate, authorize('ADMIN'), async (_req: Request, 
 });
 
 // GET /api/admin/analytics/funnel — checkout funnel & abandonment
-router.get('/funnel', authenticate, authorize('ADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/funnel', authenticate, requirePermission('analytics.view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
@@ -182,7 +182,7 @@ router.get('/funnel', authenticate, authorize('ADMIN'), async (_req: Request, re
 });
 
 // GET /api/admin/analytics/coupons — coupon effectiveness
-router.get('/coupons', authenticate, authorize('ADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/coupons', authenticate, requirePermission('analytics.view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const coupons = await prisma.coupon.findMany({
       orderBy: { usedCount: 'desc' },
@@ -220,7 +220,7 @@ router.get('/coupons', authenticate, authorize('ADMIN'), async (_req: Request, r
 });
 
 // GET /api/admin/analytics/fraud — high-risk orders
-router.get('/fraud', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/fraud', authenticate, requirePermission('analytics.view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const threshold = Math.max(0, parseInt((req.query.threshold as string) ?? '30', 10) || 30);
     const alerts = await getFraudAlerts(threshold, 50);
@@ -231,7 +231,7 @@ router.get('/fraud', authenticate, authorize('ADMIN'), async (req: Request, res:
 });
 
 // GET /api/admin/analytics/customers — customer intelligence (revenue per customer, repeat rate, CLV)
-router.get('/customers', authenticate, authorize('ADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/customers', authenticate, requirePermission('analytics.view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const PAID_STATUSES = PAID_ORDER_STATUSES;

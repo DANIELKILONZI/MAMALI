@@ -1,8 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { adminApi, AdminUser } from '@/lib/api';
+import { can as canPermission, isOwnerRole, type Permission } from '@/lib/permissions';
 
 interface AuthContextType {
   user: AdminUser | null;
@@ -10,7 +11,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
-  isAdmin: boolean;
+  isOwner: boolean;
+  can: (permission: Permission) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -43,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('mamali_admin_token', newToken);
     setToken(newToken);
     setUser(newUser);
-    router.push('/dashboard');
+    router.push(landingPath(newUser));
   };
 
   const logout = () => {
@@ -53,13 +55,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/login');
   };
 
-  return (
-    <AuthContext.Provider
-      value={{ user, token, login, logout, isLoading, isAdmin: user?.role === 'admin' }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const isOwner = isOwnerRole(user?.role);
+  const can = (permission: Permission) => canPermission(user?.role, user?.permissions, permission);
+
+  const value = React.useMemo(
+    () => ({ user, token, login, logout, isLoading, isOwner, can }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, token, isLoading]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
@@ -68,23 +73,72 @@ export function useAuth() {
   return ctx;
 }
 
+/**
+ * Guards a page. Pass `ownerOnly` for owner-exclusive pages (advertisements,
+ * staff, settings), or a `permission` for delegatable pages. A signed-in
+ * user who lacks access is redirected to the first page they can reach.
+ */
 export function withAuth<P extends object>(
   Component: React.ComponentType<P>,
-  adminOnly = false
+  guard: boolean | { ownerOnly?: boolean; permission?: Permission } = false
 ) {
+  const opts = typeof guard === 'boolean' ? { ownerOnly: guard } : guard;
+
   return function ProtectedComponent(props: P) {
-    const { user, isLoading, isAdmin } = useAuth();
+    const { user, isLoading, isOwner, can } = useAuth();
     const router = useRouter();
+    const pathname = usePathname();
+
+    const allowed =
+      !!user &&
+      (isOwner ||
+        (!opts.ownerOnly && (!opts.permission || can(opts.permission))));
+
+    // Only redirect if there's somewhere better to send them; otherwise show
+    // an inline notice (prevents a redirect loop for a user whose landing
+    // page is the very page they can't access).
+    const redirectTo = user ? landingPath(user) : '/login';
+    const shouldRedirect = !allowed && redirectTo !== pathname;
 
     useEffect(() => {
       if (!isLoading) {
         if (!user) router.push('/login');
-        else if (adminOnly && !isAdmin) router.push('/dashboard');
+        else if (shouldRedirect) router.push(redirectTo);
       }
-    }, [user, isLoading, isAdmin, router]);
+    }, [user, isLoading, shouldRedirect, redirectTo, router]);
 
     if (isLoading || !user) return null;
-    if (adminOnly && !isAdmin) return null;
+    if (!allowed) {
+      if (shouldRedirect) return null;
+      return (
+        <div className="flex min-h-screen items-center justify-center p-8 text-center">
+          <div>
+            <p className="text-lg font-semibold text-gray-900">No access yet</p>
+            <p className="mt-1 text-sm text-gray-500">
+              Your account doesn&apos;t have access to any sections. Ask the owner to grant you permissions.
+            </p>
+          </div>
+        </div>
+      );
+    }
     return <Component {...props} />;
   };
+}
+
+/** The first route a user can actually reach, for post-login / fallback redirects. */
+export function landingPath(user: AdminUser | null): string {
+  if (!user) return '/login';
+  if (isOwnerRole(user.role)) return '/dashboard';
+  const perms = user.permissions ?? [];
+  if (perms.includes('analytics.view')) return '/dashboard';
+  if (perms.includes('orders.manage')) return '/orders';
+  if (perms.includes('products.manage')) return '/products';
+  if (perms.includes('coupons.manage')) return '/coupons';
+  if (perms.includes('customers.manage')) return '/customers';
+  if (perms.includes('inventory.manage')) return '/inventory';
+  if (perms.includes('content.manage')) return '/content';
+  if (perms.includes('notifications.manage')) return '/notifications';
+  // Dashboard is the universal landing (not permission-gated at the page
+  // level), so it is always a safe redirect target and never loops.
+  return '/dashboard';
 }

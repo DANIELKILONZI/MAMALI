@@ -219,4 +219,4 @@ function EditCouponPage() {
   );
 }
 
-export default withAuth(EditCouponPage);
+export default withAuth(EditCouponPage, { permission: 'coupons.manage' });

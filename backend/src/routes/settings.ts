@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requireOwner } from '../middleware/auth';
 
 const router = Router();
 
@@ -33,7 +33,7 @@ const settingsSchema = z.object({
 });
 
 // Admin: PUT /api/admin/settings
-router.put('/', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/', authenticate, requireOwner, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = settingsSchema.parse(req.body);
     const existing = await getOrCreateSettings();

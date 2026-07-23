@@ -135,4 +135,4 @@ function NewCategoryPage() {
   );
 }
 
-export default withAuth(NewCategoryPage);
+export default withAuth(NewCategoryPage, { permission: 'categories.manage' });

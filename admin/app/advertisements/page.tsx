@@ -141,4 +141,4 @@ function AdvertisementsPage() {
   );
 }
 
-export default withAuth(AdvertisementsPage);
+export default withAuth(AdvertisementsPage, { ownerOnly: true });

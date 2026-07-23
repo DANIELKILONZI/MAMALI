@@ -113,4 +113,4 @@ function EditContentPage() {
   );
 }
 
-export default withAuth(EditContentPage);
+export default withAuth(EditContentPage, { permission: 'content.manage' });

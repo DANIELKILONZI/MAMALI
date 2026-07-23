@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requirePermission } from '../middleware/auth';
 import { couponPreviewLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
@@ -53,7 +53,7 @@ router.post('/apply', couponPreviewLimiter, async (req: Request, res: Response, 
 });
 
 // Admin: get single coupon
-router.get('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', authenticate, requirePermission('coupons.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const coupon = await prisma.coupon.findUnique({ where: { id: String(req.params.id) } });
     if (!coupon) {
@@ -67,7 +67,7 @@ router.get('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: R
 });
 
 // Admin: list coupons
-router.get('/', authenticate, authorize('ADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/', authenticate, requirePermission('coupons.manage'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const coupons = await prisma.coupon.findMany({ orderBy: { createdAt: 'desc' } });
     res.json({ success: true, coupons });
@@ -105,7 +105,7 @@ const couponSchema = couponSchemaBase.superRefine((data, ctx) => {
 });
 
 // Admin: create coupon
-router.post('/', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', authenticate, requirePermission('coupons.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = couponSchema.parse(req.body);
     const exists = await prisma.coupon.findUnique({ where: { code: data.code } });
@@ -126,7 +126,7 @@ router.post('/', authenticate, authorize('ADMIN'), async (req: Request, res: Res
 });
 
 // Admin: update coupon
-router.put('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', authenticate, requirePermission('coupons.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = couponSchemaBase.partial().parse(req.body);
     if (!validatePercentDiscount(data)) {
@@ -156,7 +156,7 @@ router.put('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: R
 });
 
 // Admin: delete coupon
-router.delete('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', authenticate, requirePermission('coupons.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.coupon.delete({ where: { id: String(req.params.id) } });
     res.json({ success: true, message: 'Coupon deleted' });

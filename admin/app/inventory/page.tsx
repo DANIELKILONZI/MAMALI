@@ -215,4 +215,4 @@ function InventoryPage() {
   );
 }
 
-export default withAuth(InventoryPage);
+export default withAuth(InventoryPage, { permission: 'inventory.manage' });

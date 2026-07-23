@@ -255,4 +255,4 @@ function NotificationsPage() {
   );
 }
 
-export default withAuth(NotificationsPage);
+export default withAuth(NotificationsPage, { permission: 'notifications.manage' });

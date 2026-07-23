@@ -155,4 +155,4 @@ function OrdersPage() {
   );
 }
 
-export default withAuth(OrdersPage);
+export default withAuth(OrdersPage, { permission: 'orders.manage' });

@@ -204,4 +204,4 @@ function EditAdPage() {
   );
 }
 
-export default withAuth(EditAdPage);
+export default withAuth(EditAdPage, { ownerOnly: true });

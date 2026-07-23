@@ -410,5 +410,5 @@ function AnalyticsPage() {
   );
 }
 
-export default withAuth(AnalyticsPage);
+export default withAuth(AnalyticsPage, { permission: 'analytics.view' });
 

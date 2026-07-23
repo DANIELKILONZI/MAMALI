@@ -213,4 +213,4 @@ function AlertsPage() {
   );
 }
 
-export default withAuth(AlertsPage);
+export default withAuth(AlertsPage, { permission: 'analytics.view' });

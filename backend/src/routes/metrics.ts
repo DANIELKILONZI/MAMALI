@@ -1,11 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requirePermission } from '../middleware/auth';
 import { countLowStockProducts } from '../services/inventory';
 
 const router = Router();
 
-router.get('/', authenticate, authorize('ADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/', authenticate, requirePermission('analytics.view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const now = new Date();
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);

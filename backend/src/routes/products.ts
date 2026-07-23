@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requirePermission } from '../middleware/auth';
 
 const router = Router();
 
@@ -91,7 +91,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
   }
 });
 
-router.post('/', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', authenticate, requirePermission('products.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = productSchema.parse(req.body);
     const exists = await prisma.product.findUnique({ where: { slug: data.slug } });
@@ -113,7 +113,7 @@ router.post('/', authenticate, authorize('ADMIN'), async (req: Request, res: Res
   }
 });
 
-router.put('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', authenticate, requirePermission('products.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = productSchema.partial().parse(req.body);
     if (data.slug) {
@@ -141,7 +141,7 @@ router.put('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: R
   }
 });
 
-router.delete('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', authenticate, requirePermission('products.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.product.update({ where: { id: String(req.params.id) }, data: { isActive: false } });
     res.json({ success: true, message: 'Product deactivated' });

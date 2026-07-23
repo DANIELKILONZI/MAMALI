@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { initiateSTKPush, verifyTransaction } from '../services/mpesa';
 import { generateIdempotencyKey, isRequestProcessed, markRequestProcessed } from '../utils/idempotency';
 import { logger, dbLog } from '../utils/logger';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requirePermission } from '../middleware/auth';
 import { sendPaymentConfirmation } from '../services/notifications';
 import { transitionOrderToPaid } from '../services/orderLifecycle';
 
@@ -237,7 +237,7 @@ const reconcileSchema = z.object({
   orderIds: z.array(z.string()).optional(),
 });
 
-router.post('/reconcile', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/reconcile', authenticate, requirePermission('orders.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orderIds } = reconcileSchema.parse(req.body);
 

@@ -13,6 +13,9 @@ model User {
   email          String         @unique
   password       String
   role           String         @default("STAFF")
+  // JSON array of delegated permission strings (see lib/permissions.ts).
+  // Ignored for OWNER, who implicitly holds every permission.
+  permissions    String         @default("[]")
   isActive       Boolean        @default(true)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt

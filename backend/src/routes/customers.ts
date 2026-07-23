@@ -10,7 +10,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requirePermission } from '../middleware/auth';
 import { PAID_ORDER_STATUSES, HIGH_RISK_SCORE_THRESHOLD } from '../lib/constants';
 import { normalizePhone } from '../utils/phone';
 
@@ -37,7 +37,7 @@ function deriveSegment(
 router.get(
   '/',
   authenticate,
-  authorize('ADMIN', 'STAFF'),
+  requirePermission('customers.manage'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const page = Math.max(1, parseInt((req.query.page as string) ?? '1', 10));
@@ -127,7 +127,7 @@ router.get(
 router.get(
   '/:phone',
   authenticate,
-  authorize('ADMIN', 'STAFF'),
+  requirePermission('customers.manage'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const phone = decodeURIComponent(String(req.params.phone));
@@ -177,7 +177,7 @@ router.get(
 router.post(
   '/:phone/block',
   authenticate,
-  authorize('ADMIN'),
+  requirePermission('customers.manage'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const rawPhone = decodeURIComponent(String(req.params.phone));
@@ -201,7 +201,7 @@ router.post(
 router.delete(
   '/:phone/block',
   authenticate,
-  authorize('ADMIN'),
+  requirePermission('customers.manage'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const rawPhone = decodeURIComponent(String(req.params.phone));

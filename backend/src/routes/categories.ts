@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requirePermission } from '../middleware/auth';
 
 const router = Router();
 
@@ -62,7 +62,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
   }
 });
 
-router.post('/', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', authenticate, requirePermission('categories.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = categorySchema.parse(req.body);
     const exists = await prisma.category.findUnique({ where: { slug: data.slug } });
@@ -77,7 +77,7 @@ router.post('/', authenticate, authorize('ADMIN'), async (req: Request, res: Res
   }
 });
 
-router.put('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', authenticate, requirePermission('categories.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = categorySchema.partial().parse(req.body);
     if (data.slug) {
@@ -96,7 +96,7 @@ router.put('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: R
   }
 });
 
-router.delete('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', authenticate, requirePermission('categories.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Move products to uncategorized
     await prisma.product.updateMany({ where: { categoryId: String(req.params.id) }, data: { categoryId: null } });

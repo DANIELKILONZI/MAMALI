@@ -95,8 +95,19 @@ npm run dev    # starts on http://localhost:3001
 - Order expiry and payment timeout
 - Zod validation on all inputs
 
+### 🔑 Roles & Delegation
+- **Owner** — full control of the business; the only role that can manage
+  advertisements, staff, and store settings, and the only one who can
+  delegate roles. Cannot be demoted or deactivated.
+- **Staff** — employees whose access is exactly the permissions the owner
+  grants them (products, categories, orders, inventory, coupons, content,
+  customers, analytics, notifications). Advertisements, staff management,
+  and settings are never delegatable.
+- Permission and role changes take effect immediately (checked live per
+  request); deactivating an employee revokes access at once.
+
 ### 🔐 Infrastructure
-- JWT authentication with ADMIN / STAFF roles
+- JWT authentication with OWNER / STAFF roles + granular permissions
 - bcrypt password hashing (10 rounds)
 - Rate limiting (auth: 5/15 min, general: 100/15 min)
 - Helmet security headers

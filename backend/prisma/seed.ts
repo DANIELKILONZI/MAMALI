@@ -12,15 +12,24 @@ async function main() {
     const hashedPassword = await bcrypt.hash('Admin@123', 10);
     await prisma.user.create({
       data: {
-        name: 'Admin User',
+        name: 'Owner',
         email: 'admin@mamali.com',
         password: hashedPassword,
-        role: 'ADMIN',
+        role: 'OWNER',
       },
     });
-    console.log('Default admin user created: admin@mamali.com / Admin@123');
+    console.log('Default owner created: admin@mamali.com / Admin@123');
   } else {
-    console.log('Admin user already exists.');
+    console.log('Owner account already exists.');
+  }
+
+  // Migrate any legacy ADMIN accounts to OWNER.
+  const migrated = await prisma.user.updateMany({
+    where: { role: 'ADMIN' },
+    data: { role: 'OWNER' },
+  });
+  if (migrated.count > 0) {
+    console.log(`Migrated ${migrated.count} legacy ADMIN account(s) to OWNER.`);
   }
 
   // Seed homepage sections

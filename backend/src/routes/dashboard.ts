@@ -1,10 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requirePermission } from '../middleware/auth';
 import { getDashboardStats } from '../services/analytics';
 
 const router = Router();
 
-router.get('/', authenticate, authorize('ADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/', authenticate, requirePermission('analytics.view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const stats = await getDashboardStats();
     res.json({ success: true, ...stats });

@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requirePermission } from '../middleware/auth';
 
 const router = Router();
 
@@ -38,7 +38,7 @@ router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => 
 const adminContentRouter = Router();
 const adminHomepageRouter = Router();
 
-adminContentRouter.get('/', authenticate, authorize('ADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+adminContentRouter.get('/', authenticate, requirePermission('content.manage'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const pages = await prisma.contentPage.findMany({ orderBy: { slug: 'asc' } });
     res.json({ success: true, pages });
@@ -47,7 +47,7 @@ adminContentRouter.get('/', authenticate, authorize('ADMIN'), async (_req: Reque
   }
 });
 
-adminContentRouter.get('/:slug', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+adminContentRouter.get('/:slug', authenticate, requirePermission('content.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = await prisma.contentPage.findUnique({ where: { slug: String(req.params.slug) } });
     if (!page) {
@@ -60,7 +60,7 @@ adminContentRouter.get('/:slug', authenticate, authorize('ADMIN'), async (req: R
   }
 });
 
-adminContentRouter.put('/:slug', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+adminContentRouter.put('/:slug', authenticate, requirePermission('content.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = z.object({
       title: z.string().min(1).optional(),
@@ -75,7 +75,7 @@ adminContentRouter.put('/:slug', authenticate, authorize('ADMIN'), async (req: R
   }
 });
 
-adminHomepageRouter.put('/:id', authenticate, authorize('ADMIN'), async (req: Request, res: Response, next: NextFunction) => {
+adminHomepageRouter.put('/:id', authenticate, requirePermission('content.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = z.object({
       title: z.string().optional(),

@@ -19,7 +19,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requirePermission } from '../middleware/auth';
 
 const router = Router();
 
@@ -200,7 +200,7 @@ async function lowStockCriticalAlert(): Promise<Alert | null> {
 router.get(
   '/',
   authenticate,
-  authorize('ADMIN', 'STAFF'),
+  requirePermission('analytics.view'),
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const oneHourAgo  = new Date(Date.now() - 60 * 60 * 1000);

@@ -146,4 +146,4 @@ function EditCategoryPage() {
   );
 }
 
-export default withAuth(EditCategoryPage);
+export default withAuth(EditCategoryPage, { permission: 'categories.manage' });

@@ -1,12 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requirePermission } from '../middleware/auth';
 import { getLowStockProducts } from '../services/inventory';
 
 const router = Router();
 
 // GET /api/admin/inventory/intelligence — fast movers, dead stock, reorder alerts
-router.get('/intelligence', authenticate, authorize('ADMIN'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/intelligence', authenticate, requirePermission('inventory.manage'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);

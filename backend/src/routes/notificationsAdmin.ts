@@ -7,7 +7,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, requirePermission } from '../middleware/auth';
 import { retryNotificationLog } from '../services/notifications';
 
 const router = Router();
@@ -16,7 +16,7 @@ const router = Router();
 router.get(
   '/',
   authenticate,
-  authorize('ADMIN', 'STAFF'),
+  requirePermission('notifications.manage'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const page = Math.max(1, parseInt((req.query.page as string) ?? '1', 10));
@@ -64,7 +64,7 @@ router.get(
 router.post(
   '/:id/resend',
   authenticate,
-  authorize('ADMIN'),
+  requirePermission('notifications.manage'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const log = await prisma.notificationLog.findUnique({

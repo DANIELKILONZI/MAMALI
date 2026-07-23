@@ -175,4 +175,4 @@ function NewCouponPage() {
   );
 }
 
-export default withAuth(NewCouponPage);
+export default withAuth(NewCouponPage, { permission: 'coupons.manage' });

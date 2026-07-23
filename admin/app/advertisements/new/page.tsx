@@ -173,4 +173,4 @@ function NewAdPage() {
   );
 }
 
-export default withAuth(NewAdPage);
+export default withAuth(NewAdPage, { ownerOnly: true });

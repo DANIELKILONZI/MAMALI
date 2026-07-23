@@ -400,4 +400,4 @@ function CustomersPage() {
   );
 }
 
-export default withAuth(CustomersPage);
+export default withAuth(CustomersPage, { permission: 'customers.manage' });

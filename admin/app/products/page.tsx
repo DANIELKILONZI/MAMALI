@@ -191,4 +191,4 @@ function ProductsPage() {
   );
 }
 
-export default withAuth(ProductsPage);
+export default withAuth(ProductsPage, { permission: 'products.manage' });

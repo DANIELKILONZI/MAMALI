@@ -212,4 +212,4 @@ function OrderDetailPage() {
   );
 }
 
-export default withAuth(OrderDetailPage);
+export default withAuth(OrderDetailPage, { permission: 'orders.manage' });

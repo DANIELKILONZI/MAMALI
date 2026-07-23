@@ -141,4 +141,4 @@ function CategoriesPage() {
   );
 }
 
-export default withAuth(CategoriesPage);
+export default withAuth(CategoriesPage, { permission: 'categories.manage' });

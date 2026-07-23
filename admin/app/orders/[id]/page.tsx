@@ -8,11 +8,13 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { withAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
 
+// Must match the backend VALID_TRANSITIONS (backend/src/routes/orders.ts).
+// Refunds are ADMIN-only and reachable from paid/processing/delivered.
 const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   pending: ['awaiting_payment', 'cancelled'],
   awaiting_payment: ['paid', 'cancelled'],
-  paid: ['processing', 'cancelled', 'refunded'],
-  processing: ['delivered', 'cancelled'],
+  paid: ['processing', 'refunded'],
+  processing: ['delivered', 'refunded'],
   delivered: ['refunded'],
   cancelled: [],
   refunded: [],

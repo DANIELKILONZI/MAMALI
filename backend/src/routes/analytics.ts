@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { authenticate, authorize } from '../middleware/auth';
 import { getFraudAlerts } from '../services/fraud';
 import { PAID_ORDER_STATUSES } from '../lib/constants';
+import { eatDayKey } from '../utils/time';
 
 const router = Router();
 
@@ -20,10 +21,11 @@ router.get('/revenue', authenticate, authorize('ADMIN'), async (_req: Request, r
       orderBy: { createdAt: 'asc' },
     });
 
-    // Bucket by date string (YYYY-MM-DD)
+    // Bucket by Nairobi calendar day (orders are stored in UTC; keying by
+    // UTC day shifted every evening order onto the next day)
     const byDay: Record<string, { revenue: number; orders: number; discountGiven: number }> = {};
     for (const o of orders) {
-      const day = o.createdAt.toISOString().slice(0, 10);
+      const day = eatDayKey(o.createdAt);
       if (!byDay[day]) byDay[day] = { revenue: 0, orders: 0, discountGiven: 0 };
       byDay[day].revenue += o.total;
       byDay[day].orders += 1;
@@ -35,7 +37,7 @@ router.get('/revenue', authenticate, authorize('ADMIN'), async (_req: Request, r
     const cursor = new Date(thirtyDaysAgo);
     const today = new Date();
     while (cursor <= today) {
-      const key = cursor.toISOString().slice(0, 10);
+      const key = eatDayKey(cursor);
       trend.push({ date: key, ...(byDay[key] ?? { revenue: 0, orders: 0, discountGiven: 0 }) });
       cursor.setDate(cursor.getDate() + 1);
     }

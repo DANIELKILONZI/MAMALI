@@ -1,11 +1,13 @@
 import { prisma } from '../lib/prisma';
 import { PAID_ORDER_STATUSES } from '../lib/constants';
+import { startOfEatMonth } from '../utils/time';
 
 export async function getDashboardStats() {
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+  // Month boundaries in the business timezone (Africa/Nairobi), not
+  // wherever the server happens to run.
+  const startOfMonth = startOfEatMonth(0);
+  const startOfLastMonth = startOfEatMonth(-1);
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const PAID = PAID_ORDER_STATUSES;
@@ -35,7 +37,9 @@ export async function getDashboardStats() {
     prisma.order.aggregate({
       where: {
         status: { in: [...PAID] },
-        createdAt: { gte: startOfLastMonth, lte: endOfLastMonth },
+        // Half-open range: the old `lte: endOfLastMonth` (midnight of the
+        // month's last day) silently dropped that entire final day.
+        createdAt: { gte: startOfLastMonth, lt: startOfMonth },
       },
       _sum: { total: true },
     }),

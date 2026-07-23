@@ -18,9 +18,9 @@ router.get('/', authenticate, authorize('ADMIN'), async (_req: Request, res: Res
 
     const ordersPerHour: Record<string, number> = {};
     for (const order of recentOrders) {
-      const hour = new Date(order.createdAt);
-      hour.setMinutes(0, 0, 0);
-      const key = hour.toISOString();
+      // Truncate to the hour in UTC — mixing local-time truncation with a
+      // UTC key shifted buckets by the server's timezone offset.
+      const key = new Date(Math.floor(order.createdAt.getTime() / 3_600_000) * 3_600_000).toISOString();
       ordersPerHour[key] = (ordersPerHour[key] ?? 0) + 1;
     }
 

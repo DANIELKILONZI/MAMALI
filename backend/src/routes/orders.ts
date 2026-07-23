@@ -32,12 +32,14 @@ const createOrderSchema = z.object({
   ).min(1),
 });
 
+// Refunds are ADMIN-only (enforced via STAFF_ALLOWED_TRANSITIONS below):
+// the admin verifies the M-Pesa reversal before marking an order refunded.
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending: ['awaiting_payment', 'cancelled'],
   awaiting_payment: ['paid', 'cancelled'],
   paid: ['processing', 'refunded'],
-  processing: ['delivered'],
-  delivered: [],
+  processing: ['delivered', 'refunded'],
+  delivered: ['refunded'],
   cancelled: [],
   refunded: [],
 };
@@ -356,6 +358,26 @@ router.put('/:id/status', authenticate, authorize('ADMIN', 'STAFF'), async (req:
         }
         await releaseCouponSlot(tx, order.id);
         return tx.order.update({ where: { id: order.id }, data: { status: 'cancelled' } });
+      });
+    } else if (status === 'refunded' && order.status === 'paid') {
+      // Refund BEFORE shipment: the goods never left, so return stock and
+      // the coupon slot (same guarded pattern as cancellation). Refunds
+      // from processing/delivered leave stock untouched — the goods are
+      // with the customer and any return is handled manually.
+      updated = await prisma.$transaction(async (tx) => {
+        const current = await tx.order.findUnique({ where: { id: order.id }, select: { status: true } });
+        if (!current || current.status !== 'paid') {
+          return tx.order.findUnique({ where: { id: order.id } });
+        }
+        const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
+        for (const item of items) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
+        await releaseCouponSlot(tx, order.id);
+        return tx.order.update({ where: { id: order.id }, data: { status: 'refunded' } });
       });
     } else {
       updated = await prisma.order.update({ where: { id: String(req.params.id) }, data: { status } });

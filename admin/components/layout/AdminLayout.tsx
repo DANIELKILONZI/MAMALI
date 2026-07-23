@@ -11,27 +11,34 @@ interface NavItem {
   href: string;
   label: string;
   icon: string;
+  group: string;
   permission?: Permission; // delegatable — visible when granted
   ownerOnly?: boolean;     // visible only to the owner
 }
 
+// Grouped by the job to be done, rather than one flat list of 15 links.
+const NAV_GROUPS = ['Overview', 'Catalogue', 'Sales', 'Marketing', 'Business'] as const;
+
 const navItems: NavItem[] = [
-  { href: '/dashboard',      label: 'Dashboard',      icon: '📊', permission: 'analytics.view' },
-  { href: '/alerts',         label: 'Alerts',          icon: '🚨', permission: 'analytics.view' },
-  { href: '/analytics',      label: 'Analytics',       icon: '📈', permission: 'analytics.view' },
-  { href: '/products',       label: 'Products',        icon: '📦', permission: 'products.manage' },
-  { href: '/categories',     label: 'Categories',      icon: '🗂️', permission: 'categories.manage' },
-  { href: '/orders',         label: 'Orders',          icon: '🛒', permission: 'orders.manage' },
-  { href: '/customers',      label: 'Customers',       icon: '👥', permission: 'customers.manage' },
-  { href: '/inventory',      label: 'Inventory',       icon: '🏭', permission: 'inventory.manage' },
-  { href: '/coupons',        label: 'Coupons',         icon: '🎟️', permission: 'coupons.manage' },
-  { href: '/notifications',  label: 'Notifications',   icon: '🔔', permission: 'notifications.manage' },
-  { href: '/content',        label: 'Content',         icon: '📄', permission: 'content.manage' },
-  { href: '/homepage',       label: 'Homepage',        icon: '🏠', permission: 'content.manage' },
-  // Owner-exclusive
-  { href: '/advertisements', label: 'Advertisements',  icon: '📢', ownerOnly: true },
-  { href: '/settings',       label: 'Settings',        icon: '⚙️', ownerOnly: true },
-  { href: '/staff',          label: 'Staff',           icon: '🧑‍💼', ownerOnly: true },
+  { group: 'Overview',  href: '/dashboard',      label: 'Dashboard',      icon: '📊', permission: 'analytics.view' },
+  { group: 'Overview',  href: '/alerts',         label: 'Alerts',         icon: '🚨', permission: 'analytics.view' },
+  { group: 'Overview',  href: '/analytics',      label: 'Analytics',      icon: '📈', permission: 'analytics.view' },
+
+  { group: 'Catalogue', href: '/products',       label: 'Products',       icon: '📦', permission: 'products.manage' },
+  { group: 'Catalogue', href: '/categories',     label: 'Categories',     icon: '🗂️', permission: 'categories.manage' },
+  { group: 'Catalogue', href: '/inventory',      label: 'Inventory',      icon: '🏭', permission: 'inventory.manage' },
+
+  { group: 'Sales',     href: '/orders',         label: 'Orders',         icon: '🛒', permission: 'orders.manage' },
+  { group: 'Sales',     href: '/customers',      label: 'Customers',      icon: '👥', permission: 'customers.manage' },
+  { group: 'Sales',     href: '/notifications',  label: 'Notifications',  icon: '🔔', permission: 'notifications.manage' },
+
+  { group: 'Marketing', href: '/coupons',        label: 'Coupons',        icon: '🎟️', permission: 'coupons.manage' },
+  { group: 'Marketing', href: '/homepage',       label: 'Homepage',       icon: '🏠', permission: 'content.manage' },
+  { group: 'Marketing', href: '/content',        label: 'Pages',          icon: '📄', permission: 'content.manage' },
+  { group: 'Marketing', href: '/advertisements', label: 'Advertisements', icon: '📢', ownerOnly: true },
+
+  { group: 'Business',  href: '/staff',          label: 'Staff',          icon: '🧑‍💼', ownerOnly: true },
+  { group: 'Business',  href: '/settings',       label: 'Settings',       icon: '⚙️', ownerOnly: true },
 ];
 
 const ALERT_POLL_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
@@ -81,39 +88,52 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <p className="text-slate-400 text-sm">Control Panel</p>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {visibleNav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive(item.href)
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-              }`}
-            >
-              <span>{item.icon}</span>
-              <span className="flex-1">{item.label}</span>
-              {/* Alert badge on the Alerts nav item */}
-              {item.href === '/alerts' && alertCount && alertCount.total > 0 && (
-                <span
-                  className={`inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-bold leading-none ${
-                    alertCount.critical > 0
-                      ? 'bg-red-500 text-white'
-                      : 'bg-yellow-400 text-yellow-900'
-                  }`}
-                >
-                  {alertCount.total}
-                </span>
-              )}
-            </Link>
-          ))}
+        <nav className="flex-1 space-y-5 overflow-y-auto p-4">
+          {NAV_GROUPS.map((group) => {
+            const items = visibleNav.filter((i) => i.group === group);
+            if (items.length === 0) return null; // hide empty groups entirely
+            return (
+              <div key={group}>
+                <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  {group}
+                </p>
+                <div className="space-y-0.5">
+                  {items.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-current={isActive(item.href) ? 'page' : undefined}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                        isActive(item.href)
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-300 hover:bg-slate-700/70 hover:text-white'
+                      }`}
+                    >
+                      <span aria-hidden="true">{item.icon}</span>
+                      <span className="flex-1 truncate">{item.label}</span>
+                      {item.href === '/alerts' && alertCount && alertCount.total > 0 && (
+                        <span
+                          className={`inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-bold leading-none ${
+                            alertCount.critical > 0
+                              ? 'bg-red-500 text-white'
+                              : 'bg-yellow-400 text-yellow-900'
+                          }`}
+                        >
+                          {alertCount.total}
+                        </span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </nav>
 
         <div className="p-4 border-t border-slate-700">
           <div className="mb-3">
-            <p className="text-sm font-medium text-white">{user?.name}</p>
-            <p className="text-xs text-slate-400 capitalize">{user?.role}</p>
+            <p className="truncate text-sm font-medium text-white">{user?.name}</p>
+            <p className="text-xs text-slate-400">{isOwner ? 'Owner' : 'Staff'}</p>
           </div>
           <button
             onClick={logout}

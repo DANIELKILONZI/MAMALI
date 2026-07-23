@@ -6,6 +6,7 @@ import { adminApi, DashboardData, FraudAlerts } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import AdminLayout from '@/components/layout/AdminLayout';
 import StatusBadge from '@/components/ui/StatusBadge';
+import PageHeader from '@/components/ui/PageHeader';
 import { withAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -33,13 +34,17 @@ function DashboardPage() {
 
   return (
     <AdminLayout>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-        <p className="text-gray-500 text-sm mt-1">Welcome back, {user?.name}</p>
-      </div>
+      <PageHeader title="Dashboard" description={`Welcome back, ${user?.name ?? ''}`} />
 
       {isLoading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {['a', 'b', 'c', 'd'].map((k) => (
+              <div key={k} className="h-28 animate-pulse rounded-xl border border-gray-200 bg-white" />
+            ))}
+          </div>
+          <div className="h-64 animate-pulse rounded-xl border border-gray-200 bg-white" />
+        </div>
       ) : data ? (
         <div className="space-y-6">
           {/* High-Risk Fraud Alert Banner */}

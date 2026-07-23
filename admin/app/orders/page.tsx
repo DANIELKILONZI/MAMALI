@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { adminApi, Order, OrderStatus } from '@/lib/api';
 import AdminLayout from '@/components/layout/AdminLayout';
+import PageHeader from '@/components/ui/PageHeader';
+import SearchInput from '@/components/ui/SearchInput';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Pagination from '@/components/ui/Pagination';
 import { withAuth } from '@/context/AuthContext';
@@ -40,7 +42,7 @@ function OrdersPage() {
       .finally(() => setIsLoading(false));
   };
 
-  useEffect(() => { fetchOrders(); }, [page, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchOrders(); }, [page, statusFilter, search]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,19 +55,16 @@ function OrdersPage() {
 
   return (
     <AdminLayout>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Orders</h2>
-      </div>
+      <PageHeader title="Orders" description="Every order, newest first. Click a row to open it." />
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4 mb-4 space-y-3">
-        <form onSubmit={handleSearch} className="flex gap-2 flex-wrap">
-          <input
-            type="text"
+      <div className="mb-4 space-y-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+        <form onSubmit={handleSearch} className="flex flex-wrap gap-2">
+          <SearchInput
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search order # or phone..."
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-48 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={(v) => { setSearch(v); setPage(1); }}
+            placeholder="Search order # or phone…"
+            className="min-w-[220px] flex-1"
           />
           <select
             value={statusFilter}

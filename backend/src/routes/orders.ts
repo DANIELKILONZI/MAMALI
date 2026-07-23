@@ -10,6 +10,7 @@ import { sendOrderConfirmation, sendOrderCancellation, sendOrderShipped, sendOrd
 import { normalizePhone } from '../utils/phone';
 import { releaseCouponSlot } from '../services/orderLifecycle';
 import { HIGH_RISK_SCORE_THRESHOLD } from '../lib/constants';
+import { EAT_UTC_OFFSET_MS } from '../utils/time';
 
 const router = Router();
 
@@ -252,7 +253,7 @@ router.post('/', checkoutRateLimiter, async (req: Request, res: Response, next: 
 
 router.get('/list', authenticate, requirePermission('orders.manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { status, page: pageParam = '1', limit: limitParam = '20', search } = req.query;
+    const { status, page: pageParam = '1', limit: limitParam = '20', search, from, to } = req.query;
     const page = Math.max(1, parseInt(pageParam as string, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(limitParam as string, 10) || 1));
     const skip = (page - 1) * limit;
@@ -265,6 +266,20 @@ router.get('/list', authenticate, requirePermission('orders.manage'), async (req
         { customerName: { contains: search as string } },
         { customerPhone: { contains: search as string } },
       ];
+    }
+    // Date range (admin filters send YYYY-MM-DD). 'to' is inclusive of the
+    // whole day, interpreted in the business timezone.
+    if (from || to) {
+      const range: Record<string, Date> = {};
+      if (from) {
+        const start = new Date(`${String(from)}T00:00:00.000Z`);
+        if (!isNaN(start.getTime())) range.gte = new Date(start.getTime() - EAT_UTC_OFFSET_MS);
+      }
+      if (to) {
+        const end = new Date(`${String(to)}T23:59:59.999Z`);
+        if (!isNaN(end.getTime())) range.lte = new Date(end.getTime() - EAT_UTC_OFFSET_MS);
+      }
+      if (Object.keys(range).length > 0) where.createdAt = range;
     }
 
     const [orders, total] = await Promise.all([
